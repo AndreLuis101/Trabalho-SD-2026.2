@@ -12,7 +12,7 @@
 
 | Seção | Conteúdo | Etapa da disciplina |
 |---|---|---|
-| [1](#1-objetivo-do-projeto) | Objetivo do projeto | — |
+| [1](#1-objetivo-do-projeto) | Objetivo do projeto | Etapa 1 |
 | [2](#2-descrição-gráfica-do-funcionamento-do-sistema) | Descrição gráfica do funcionamento | Etapa 1 |
 | [3](#3-adaptações-de-hardware-de10-lite) | Adaptações de hardware | Etapa 2 |
 | [4](#4-evidências-de-validação) | Evidências de validação (simulação, código, placa) | Etapas 2 e 3 |
