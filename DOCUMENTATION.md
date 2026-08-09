@@ -539,18 +539,17 @@ alinhamento saturado e o estouro do expoente. Seis casos complementares cobrem e
 | **T6** | `1,0 + 0,5` | potências de dois | **1,5 exato** — só representável porque apenas o bit 7 é forçado (§3.5) |
 | **T7** | `−24 + 4` | ordenação com o **operando 1** maior | subtrai e preserva o sinal do maior: **−20 exato** |
 | **T8** | `16384 + 0,996` | alinhamento saturado (`exp_diff = 15`) | a fração do menor é deslocada além dos 8 bits e some: **16384** |
-| **T9** | `a + (−a)` com `exp = 12` | cancelamento total com `expb ≥ 7` | zero com **expoente 5** — o zero não canônico do Apêndice A, item 1 |
+| **T9** | `a + (−a)` com `exp = 12` | cancelamento total com `expb ≥ 7` | zero com **expoente 5** — o zero não canônico, limitação conhecida do somador |
 | **T10** | `32640 + 32640` | **estouro do expoente** | `expn = 15 + 1` dá a volta; `HEX5` acende `C` e o valor lido é **65280** |
 | **T11** | `KEY1` (reinício) | autoteste do reset | `+1,0 + 1,0 = 2,0` exato |
 
 
 ### 4.4 Formas de onda — o 4º estágio (normalização)
 
-> **[placeholder — imagens a fornecer]**
-> Rodar `do sim_demo.do` no Questa e capturar a janela Wave para cada caso.
-> Os sinais que importam estão no divisor **"Estagios internos do somador"**:
-> `expb`, `exps`, `exp_diff`, `fracb`, `fracs`, `fraca`, `sum`, `leado`, `sum_norm`,
-> mais `exp_out` e `frac_out` no divisor "Resultado".
+As capturas abaixo vêm da janela Wave do Questa, com o cursor posicionado ao fim de cada caso.
+Os sinais relevantes estão no divisor **"Estagios internos do somador"** — `expb`, `exps`,
+`exp_diff`, `fracb`, `fracs`, `fraca`, `sum`, `leado`, `sum_norm` — mais `exp_out` e
+`frac_out` no divisor "Resultado".
 
 **Caso I — sem ajuste (EG1):** `sum(8)=0`, `leado=0`, resultado sai como está.
 
@@ -999,23 +998,23 @@ o `sign_out` acompanha o maior, e `LEDR9` acende.
 `0xA0 + 0x40 = 0xE0` sem estourar os 8 bits, e a normalização não tem o que fazer
 (`leado = 0`). Leitura: $(224/256) \times 2^{2} = 3{,}5$ — exato.
 
-É o **caso I** da normalização (§2.3), o mesmo ramo do `EG1`.
 ---
 
 *Etapa 4*
 
 ## 5. Diário de Bordo de IA
 
-Utilizamos **ChatGPT** (formatação inicial, primeira versão do wrapper de placa e depuração
-no Quartus) e **Claude** (testbench auto-verificável, script de simulação, análise de casos de
-borda e ferramentas de depuração). Os registros completos das conversas estão em
-[`resources/`](resources/):
+Usamos duas ferramentas, em fases distintas do trabalho:
 
-| Arquivo | Ferramenta | Assunto |
-|---|---|---|
-| [`resources/chat_gpt_01.txt`](resources/chat_gpt_01.txt) | ChatGPT | formatação do VHDL extraído do PDF; busca pelos módulos auxiliares |
-| [`resources/chat_gpt_02.txt`](resources/chat_gpt_02.txt) | ChatGPT | criação do projeto no Quartus, pinagem, primeira versão do `fp_adder_demo` |
-| [`resources/claude_03.md`](resources/claude_03.md) | Claude | testbench, `sim_demo.do`, protocolo de campo, indicador `C`, análise de casos de borda |
+| Ferramenta | Onde atuou |
+|---|---|
+| **ChatGPT** | transcrição e formatação do VHDL do PDF; criação do projeto no Quartus e pinagem; primeira versão do wrapper `fp_adder_demo`; depuração dos displays na placa |
+| **Claude** | testbench e `sim_demo.do`; protocolo de entrada por campo; indicador `C` de estouro; análise de casos de borda; ferramentas de depuração em HTML |
+
+Foram três conversas ao todo — duas com ChatGPT, uma longa com Claude. **Esta seção reproduz
+os prompts que efetivamente mudaram o projeto, os erros cometidos pelas ferramentas e as
+correções que aplicamos**, de modo que a auditoria possa ser feita sem consultar os
+registros originais.
 
 Artefatos de depuração gerados com IA e mantidos em [`debug/`](debug/):
 
@@ -1033,9 +1032,11 @@ waveform. No sentido inverso, recebe um decimal e devolve a sequência de chaves
 digitá-lo na placa, informando se o valor é exato, aproximado ou fora de faixa. Foi com ele
 que geramos os valores esperados antes de rodar a simulação.
 
-![fp_adder_debug.html em uso](placeholder-debug-calculadora.png)
+![fp_adder_debug.html em uso](img/debug-fp-adder-debug.png)
 
-`[placeholder]`
+*Conversão de `70.5`: a página devolve `(0x8D / 256) × 2⁷`, classifica como **exato** e lista
+os quatro passos de chaves. Abaixo, os painéis dos operandos bit a bit, a réplica dos displays
+com o valor decimal, e o detalhamento estágio por estágio.*
 
 **`de10_wave_player.html` — reprodutor de VCD.** Lê um VCD exportado do Questa
 (o do nosso testbench está em [`debug/sim_demo.vcd`](debug/sim_demo.vcd)) e desenha a
@@ -1043,9 +1044,12 @@ DE10-Lite animada, com chaves, LEDs e os seis displays, mais uma linha do tempo 
 avança e retrocede na simulação. Um painel lateral mostra o valor decimal do que está no
 display. Permitiu revisar a operação da placa sem precisar decorar padrões de sete segmentos.
 
-![de10_wave_player.html em uso](placeholder-debug-wave-player.png)
+![de10_wave_player.html em uso](img/debug-de10-wave-player.png)
 
-`[placeholder]`
+*Reprodução de `debug/sim_demo.vcd` no instante 330 ns (evento 10 de 147). Os displays mostram
+`- 4. 8 0`, que o painel traduz para `−(0x80 / 256) × 2⁴ = −8`. Abaixo, a linha do tempo e a
+tabela de mapeamento, que permite apontar outros nomes de sinal caso o VCD venha de um
+testbench diferente.*
 
 O uso do reprodutor está demonstrado em
 [`img/de10-wave-player-uso.mp4`](img/de10-wave-player-uso.mp4): carregamento do VCD, navegação
@@ -1053,8 +1057,8 @@ pela linha do tempo e leitura dos displays acompanhando a simulação.
 
 ### 5.1 Prompts utilizados (seleção)
 
-Reproduzimos abaixo os prompts que mais influenciaram o resultado final. A lista completa
-está nos arquivos de `resources/`.
+Abaixo, transcritos literalmente, os prompts que mudaram o rumo do projeto. Cada um está
+seguido do que produziu.
 
 > **[ChatGPT #1]** "Formate corretamente estes arquivos VHDL" *(seguido do texto colado
 > diretamente do PDF do livro)*
@@ -1154,14 +1158,15 @@ fração mais próxima." Traduzir `0.54 → 0x8A`, `0.87 → 0xDF` etc. preserva
 rastreabilidade com o livro, o que a busca estrutural destruía.
 
 **(8) Divergência entre o registro da conversa e o estado real dos arquivos.**
-O log em `resources/claude_03.md` afirma que o testbench tem "19 casos" e "~600 linhas", e
+Ao final da sessão, o Claude produziu um resumo do próprio trabalho afirmando que o testbench
+tinha "19 casos" e "~600 linhas", e
 menciona um `fp_radix.do` de ~100 linhas. A versão que recebemos tinha **485 linhas e 5
 casos**, e `fp_radix.do` **não está no repositório**. Isso não é alucinação de código, mas é
 um lembrete de que **sumários gerados por IA sobre o próprio trabalho não são fonte confiável
 de verdade** — conferimos contra os arquivos. A cobertura foi depois completada por nós, com
 os seis casos complementares descritos em §4.3.
 
-**(9) Números de validação não reproduzíveis.** O log cita varreduras de "16.777.216
+**(9) Números de validação não reproduzíveis.** O mesmo resumo cita varreduras de "16.777.216
 combinações, 0 divergências", executadas em modelos JavaScript e GHDL dentro do ambiente da
 IA. **Não conseguimos reproduzir essas execuções**, e portanto elas **não** são apresentadas
 como evidência neste relatório. A evidência que sustenta o trabalho é a simulação no Questa
@@ -1202,7 +1207,28 @@ levantadora de alternativas:
   seja, normalizado); deslocar 2 daria `0x0C`. Aqui a IA nos corrigiu, e a verificação
   independente foi nossa.
 
-### 5.4 Avaliação crítica do uso da ferramenta
+### 5.4 O que aceitamos, e por quê
+
+Nem tudo o que a IA propôs foi rejeitado — a maior parte do que está no `fp_adder_demo.vhd`
+nasceu de uma sugestão que analisamos e adotamos. Registramos aqui **o critério** usado em
+cada caso, porque aceitar sem entender teria produzido o mesmo código sem nenhum aprendizado.
+
+| Sugestão adotada | Por que aceitamos | O que aprendemos com isso |
+|---|---|---|
+| **Multiplexar a entrada por campo** (`SW(9:8)` seleciona, `KEY0` carrega) | Testamos o argumento contra a alternativa do contador nos botões e ele se sustentou: a carga por chaves é *idempotente*, então repetições causadas pelo quique do botão são inofensivas. Um contador não tem essa propriedade | Que uma escolha de interface pode **eliminar** um problema de hardware (debounce) em vez de tratá-lo. Passamos a olhar a idempotência como propriedade de projeto, não como detalhe |
+| **Forçar o bit 7 da fração em `'1'`** | Verificamos a premissa no `fp_adder.vhd`: o primeiro estágio compara `exp & frac` como inteiro de 12 bits, e essa comparação só vale com operandos normalizados. Garantir isso na entrada custa um fio | Entendemos por que o livro exige entrada normalizada — não é convenção, é pré-condição do comparador. E que **garantir uma pré-condição na origem** costuma ser mais barato que detectar sua violação depois |
+| **Ler o resultado pelos sete segmentos no testbench** | A alternativa óbvia — comparar `exp_out`/`frac_out` — deixaria o decodificador e a montagem dos displays sem verificação, justamente onde já tínhamos errado antes (§5.2, item 2) | Que o testbench deve exercitar a mesma interface que o usuário, e não um atalho interno. Um erro na tabela de segmentos passaria despercebido no outro formato |
+| **Exibir o estouro como `C`, deduzido fora do somador** | Conferimos o raciocínio: com sinais iguais `exp_out` só pode ser `expb` ou `expb+1`, e o ramo geral (`expb − leado`, com `leado ≤ 7`) nunca produz `0` a partir de `expb = 15`. A dedução é válida sem tocar na entidade do livro | Que dá para **recuperar informação perdida** observando o entorno, sem modificar o bloco sob análise. Foi o achado conceitual mais útil do projeto |
+| **`vsim -voptargs=+acc` no script** | Reproduzimos o problema: sem a flag, os `add wave` dos sinais internos falham em silêncio | Que otimização de simulação pode remover justamente o que se quer observar — e que ferramenta em silêncio não significa ferramenta correta |
+
+Um contraste que vale registrar: **aceitamos a explicação sobre `leado = 6` e rejeitamos a
+proposta de underflow gradual**, ambas vindas da mesma ferramenta na mesma conversa. A
+primeira era verificável — bastava deslocar `0x03` seis casas e ver o bit 7 acender. A segunda
+era uma melhoria numérica real, mas afastava o circuito do que o livro descreve, e o trabalho
+pede fidelidade ao projeto original. **O critério não foi a confiança na ferramenta, e sim a
+possibilidade de verificar e o alinhamento com o objetivo.**
+
+### 5.5 Avaliação crítica do uso da ferramenta
 
 **Onde ajudou muito:**
 
@@ -1232,6 +1258,21 @@ levantadora de alternativas:
 * **Relatos sobre o próprio trabalho.** Contagens de casos, tamanhos de arquivo e resultados de
   varreduras precisaram ser conferidos contra os arquivos reais — e divergiram (§5.2.8, §5.2.9).
 
+**O que mudou na nossa forma de trabalhar.** Três hábitos saíram deste projeto:
+
+1. **Perguntar "como eu verifico isso?" antes de aceitar.** Foi o que separou a explicação do
+   `leado` (verificável em dois deslocamentos) das varreduras de milhões de vetores
+   (irreproduzíveis). O custo de verificar foi quase sempre menor que o custo de descobrir o
+   erro depois — o `"111" & SW(4:0)` sobreviveu várias respostas até esbarrarmos nele na
+   prática.
+2. **Tratar a IA como interlocutora, não como fonte.** As melhores contribuições vieram de
+   perguntas nossas — "e o valor do carry?", "o `leado` não deveria ser 2?" — e não de
+   pedidos genéricos de código. Quem faz a pergunta precisa entender o problema; a IA acelera
+   a resposta, não a formulação.
+3. **Separar o que é fiel do que é melhor.** O underflow gradual era objetivamente mais
+   preciso e mesmo assim foi recusado. Ter esse critério explícito evitou uma sequência de
+   "melhorias" que teriam descaracterizado o projeto do livro.
+
 **Conclusão.** A IA foi um acelerador real de produtividade e um bom interlocutor técnico,
 especialmente para explorar alternativas e explicar comportamento. Não foi confiável como
 fonte de fatos sobre hardware específico, nem como relatora do próprio trabalho. O padrão que
@@ -1252,35 +1293,15 @@ Taxonomia **CRediT** (<https://credit.niso.org/>).
   Questa, conferência do 4º estágio nas formas de onda, testes na placa DE10-Lite);
   Investigação (síntese e gravação no Quartus).
 * **[Nome do Aluno 3]** — Redação do manuscrito original (este documento); Curadoria de dados
-  (registro e auditoria do uso de IA em `resources/`); Validação de dados e experimentos.
+  (registro e auditoria do uso de IA); Validação de dados e experimentos.
 
 > **[placeholder]** — substituir os nomes e ajustar a divisão de papéis conforme a realidade
 > do grupo.
 
 ---
 
-## Apêndice A — Limitações conhecidas e aceitas
 
-Nenhuma foi corrigida: `fp_adder.vhd` permanece como no livro (§3.3). Estão aqui como
-achados documentados.
-
-| # | Limitação | Gravidade | Como se manifesta | Correção possível |
-|---|---|---|---|---|
-| 1 | **Zero não canônico.** Se a subtração cancela tudo e `expb ≥ 7`, a condição `leado > expb` é falsa e o resultado sai como `exp = expb − 7`, `frac = 0` — um padrão *desnormalizado*, isto é, a entrada que o próprio circuito não aceita | alta | um zero com expoente não nulo, realimentado numa segunda soma, produz erro de ordens de grandeza | testar `sum = 0` **antes** dos demais ramos |
-| 2 | **Estouro do expoente dá a volta** | média — **mitigada** pelo `C` no HEX5 e `LEDR(8)` | `expb = 15` com vai-um → expoente vira 0 | saturar, ou exportar flag pela entidade |
-| 3 | **Zero negativo.** A ordenação usa `>` estrito, então o empate cai no `else` e `signb` recebe `sign2` | baixa — **fiel ao livro** (`−0.00E0` no eg. 3) | cancelamento total exibe `-` com valor zero | condicionar `sign_out` a `sum = 0` (afasta do livro) |
-| 4 | **Sem arredondamento.** Truncamento em dois pontos (alinhamento e deslocamento do vai-um), sempre na mesma direção — erro enviesado | baixa | erro sistemático de até 1 ULP por operação | arredondar exige renormalizar de novo (`0xFF + 1 = 0x100`) |
-| 5 | **Underflow sempre para zero.** Entre 0,25 e 0,5 o representável mais próximo é 0,5, não 0 | baixa — **fiel ao livro** | até 100% de erro relativo nessa faixa | underflow gradual (`sh := minimum(leado, expb)`) — afasta do livro |
-| 6 | **Entrada desnormalizada produz lixo** sem sinalização | **prevenida por hardware** | não ocorre nesta implementação | já resolvido: `frac = '1' & SW(6:0)` |
-
-Uma propriedade que **não** precisa de conserto: com entrada normalizada, a subtração nunca
-fica negativa. Se `exp_diff ≥ 1`, então `fraca ≤ 0x7F < 0x80 ≤ fracb`; se `exp_diff = 0`, a
-ordenação garante `fracb ≥ fraca`. Logo `sum(8) = '1'` só pode ser vai-um legítimo, nunca
-empréstimo — o que valida a lógica do quarto estágio.
-
----
-
-## Apêndice B — Estrutura do repositório
+## Apêndice — Estrutura do repositório
 
 ```
 Trabalho-SD-2026.2/
@@ -1294,12 +1315,7 @@ Trabalho-SD-2026.2/
 ├── img/                            figuras, GIF e videos citados neste documento
 ├── tools/
 │   └── vcd_to_wavedrom.py          converte o VCD nos diagramas de debug/wavedrom/
-├── resources/
-│   ├── MCTA024_Descricao_do_projeto.md    enunciado da disciplina
-│   ├── Projeto_Final_...md                §3.7.4 do livro, transcrito
-│   ├── chat_gpt_01.txt                    registro de IA
-│   ├── chat_gpt_02.txt                    registro de IA
-│   └── claude_03.md                       registro de IA
+├── transcript_questa.txt           saida completa de `do sim_demo.do`
 └── fp_adder/
     ├── fp_adder.qpf                projeto do Quartus
     ├── fp_adder.qsf                configuração (SEM pinagem — importar DE10_LITE.qsf)
@@ -1310,29 +1326,3 @@ Trabalho-SD-2026.2/
     ├── fp_adder_demo_tb.vhd        testbench auto-verificável
     └── sim_demo.do                 script de simulação do Questa
 ```
-
-Artefatos de build (`db/`, `incremental_db/`, `output_files/`, `simulation/`, `work/`,
-`*.sof`, `*.rpt`) não são versionados. O `.gitignore` também exclui `*.tcl` e `*.sdc` — se um
-script de fluxo precisar ser versionado, usar `git add -f`.
-
----
-
-## Apêndice C — Ativos pendentes
-
-Lista consolidada do que falta anexar. Todos os itens marcados `[placeholder]` no corpo do
-documento:
-
-| # | Item | Como obter | Seção |
-|---|---|---|---|
-| ~~1~~ | ~~Waveform do caso I (EG1)~~ | **entregue** — `img/wave-eg1-caso1.png` | §4.4 |
-| ~~2~~ | ~~Waveform do caso II (T5, `E6`)~~ | **entregue** — `img/wave-t5-caso2.png` | §4.4 |
-| ~~3a~~ | ~~Waveform do caso III — EG2 em `E3`~~ | **entregue** — `img/wave-eg2-caso3.png` | §4.4 |
-| ~~3b~~ | ~~Waveform do caso III — EG3 em `E0`~~ | **entregue** — `img/wave-eg3-caso3.png` | §4.4 |
-| ~~4~~ | ~~Waveform do caso IV (EG4)~~ | **entregue** — `img/wave-eg4-caso4.png` | §4.4 |
-| ~~5~~ | ~~Waveform geral da simulação~~ | **entregue** — `img/wavedrom-todos.png` + `debug/wavedrom/` | §4.4 |
-| ~~6~~ | ~~Transcript completo do Questa~~ | **entregue** — `transcript_questa.txt`, inline em §4.5 | §4.5 |
-| ~~9~~ | ~~Fotos da placa~~ | **entregue** — 11 fotos em `img/placa/`, dois casos | §4.7 |
-| ~~10~~ | ~~Vídeo da demonstração na placa~~ | **entregue** — YouTube | §4.7 |
-| 11 | Divisão real de papéis CRediT | — | §6 |
-| 12 | Print do `fp_adder_debug.html` | abrir a página e capturar a tela | §5 |
-| 13 | Print do `de10_wave_player.html` | abrir a página, carregar um VCD e capturar | §5 |
