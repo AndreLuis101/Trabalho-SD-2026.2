@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fp_adder · banca de depuração · DE10-Lite</title>
+<style>
+  :root{
+    --ink:#17191b; --ink-soft:#5b5f63; --paper:#e7e5de; --card:#f2f1ec;
+    --rule:#c6c3b8; --rule-soft:#d8d5cb; --panel:#131110;
+    --led:#ff3d2e; --led-dim:#2e1b18; --copper:#a96a2e; --green:#12503c;
+    --mono: ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Menlo,Consolas,monospace;
+    --sans: system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--paper); color:var(--ink); font-family:var(--sans);
+        font-size:14px; line-height:1.55; -webkit-font-smoothing:antialiased; }
+  .wrap{ max-width:1120px; margin:0 auto; padding:32px 20px 72px; }
+
+  .eyebrow{ font-family:var(--mono); font-size:11px; letter-spacing:.2em;
+            text-transform:uppercase; color:var(--ink-soft); }
+  h1{ font-family:var(--mono); font-weight:700; font-size:clamp(26px,5vw,42px);
+      letter-spacing:-.03em; margin:.25em 0 .2em; }
+  .lede{ max-width:62ch; color:var(--ink-soft); margin:0 0 24px; }
+
+  .band{ border-top:1px solid var(--rule); padding-top:18px; margin-top:34px; }
+  .band-head{ display:flex; align-items:baseline; gap:12px; margin-bottom:16px; flex-wrap:wrap; }
+  .band-num{ font-family:var(--mono); font-size:11px; color:var(--copper);
+             letter-spacing:.1em; padding-top:2px; }
+  .band-title{ font-family:var(--mono); font-size:13px; text-transform:uppercase;
+               letter-spacing:.14em; font-weight:700; margin:0; }
+  .band-note{ font-size:12px; color:var(--ink-soft); }
+
+  .cols{ display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+  .split{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.05fr); gap:22px; align-items:start; }
+  @media (max-width:880px){ .cols,.split{ grid-template-columns:1fr; } }
+
+  .card{ background:var(--card); border:1px solid var(--rule-soft); padding:16px 16px 18px; }
+  .card h3{ font-family:var(--mono); font-size:12px; letter-spacing:.12em;
+            text-transform:uppercase; margin:0 0 3px; font-weight:700; }
+  .card .sub{ font-family:var(--mono); font-size:10px; letter-spacing:.1em;
+              color:var(--copper); margin:0 0 14px; }
+  .field{ margin-bottom:14px; }
+  .field:last-child{ margin-bottom:0; }
+  .flabel{ font-family:var(--mono); font-size:10.5px; letter-spacing:.12em;
+           text-transform:uppercase; color:var(--ink-soft); display:block; margin-bottom:6px; }
+
+  .switches{ display:flex; gap:4px; align-items:flex-end; }
+  .sw{ width:30px; padding:0; border:1px solid var(--rule); background:#dedbd2;
+       cursor:pointer; font-family:var(--mono); display:flex; flex-direction:column;
+       align-items:center; transition:background .12s ease; }
+  .sw:focus-visible{ outline:2px solid var(--copper); outline-offset:2px; }
+  .sw .knob{ width:100%; height:16px; background:#b9b5a9;
+             border-bottom:1px solid var(--rule); transition:background .12s ease; }
+  .sw[aria-pressed="true"] .knob{ background:var(--ink); }
+  .sw[aria-pressed="true"]{ background:#cfcbbf; }
+  .sw .val{ font-size:11px; line-height:1.5; }
+  .sw .idx{ font-size:8.5px; color:var(--ink-soft); line-height:1.4; padding-bottom:2px; }
+  .sw[disabled]{ cursor:not-allowed; opacity:.5; }
+  .sw-gap{ width:10px; }
+
+  .signbtn{ font-family:var(--mono); font-size:18px; font-weight:700; width:46px; height:40px;
+            border:1px solid var(--rule); background:#dedbd2; cursor:pointer; }
+  .signbtn:focus-visible{ outline:2px solid var(--copper); outline-offset:2px; }
+  .signbtn.neg{ background:var(--ink); color:var(--card); border-color:var(--ink); }
+
+  .readback{ font-family:var(--mono); font-size:12px; color:var(--ink-soft); margin-top:8px; }
+  .readback b{ color:var(--ink); font-weight:700; }
+
+  /* ---- conversor ---- */
+  .conv{ background:var(--card); border:1px solid var(--rule-soft); padding:16px; }
+  .convrow{ display:flex; gap:8px; align-items:stretch; flex-wrap:wrap; }
+  .conv input[type=text]{ flex:1 1 200px; font-family:var(--mono); font-size:19px;
+                          padding:10px 12px; border:1px solid var(--rule);
+                          background:var(--paper); color:var(--ink); min-width:0; }
+  .conv input[type=text]:focus-visible{ outline:2px solid var(--copper); outline-offset:-1px; }
+  .convbtn{ font-family:var(--mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase;
+            padding:10px 14px; border:1px solid var(--ink); background:var(--ink);
+            color:var(--card); cursor:pointer; white-space:nowrap; }
+  .convbtn.ghost{ background:transparent; color:var(--ink); }
+  .convbtn:focus-visible{ outline:2px solid var(--copper); outline-offset:2px; }
+  .convout{ margin-top:14px; }
+  .convval{ font-family:var(--mono); font-size:clamp(22px,4vw,32px); font-weight:700;
+            letter-spacing:-.03em; line-height:1.15; }
+  .convval.dim{ color:var(--rule); font-weight:400; }
+  .convwhy{ font-family:var(--mono); font-size:12px; color:var(--ink-soft); margin-top:5px; }
+  .convtag{ display:inline-block; font-family:var(--mono); font-size:10.5px; padding:3px 9px;
+            margin-top:8px; margin-right:6px; }
+  .convtag.exato{ background:var(--green); color:#fff; }
+  .convtag.aprox{ background:var(--copper); color:#fff; }
+  .convtag.fora{ background:#a32d2d; color:#fff; }
+  .steps{ margin-top:14px; border-top:1px solid var(--rule-soft); padding-top:12px; }
+  .step{ display:grid; grid-template-columns:26px 1fr auto; gap:10px; align-items:center;
+         padding:6px 0; font-family:var(--mono); font-size:12px; }
+  .step + .step{ border-top:1px solid var(--rule-soft); }
+  .stepn{ color:var(--copper); font-size:11px; }
+  .stepsw{ letter-spacing:.06em; }
+  .stepsw em{ font-style:normal; color:var(--ink-soft); }
+  .stepwhat{ color:var(--ink-soft); font-size:11px; text-align:right; }
+  .chips{ display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; }
+  .chip{ font-family:var(--mono); font-size:11px; padding:5px 9px; border:1px solid var(--rule);
+         background:var(--paper); color:var(--ink-soft); cursor:pointer; }
+  .chip:hover{ border-color:var(--ink); color:var(--ink); }
+  .chip:focus-visible{ outline:2px solid var(--copper); outline-offset:2px; }
+
+  /* ---- painel ---- */
+  .panel{ background:var(--panel); padding:16px 18px; }
+  .mirrorbar{ display:flex; align-items:center; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
+  .mirrorbar span{ font-family:var(--mono); font-size:9.5px; letter-spacing:.12em;
+                   text-transform:uppercase; color:#7d716b; }
+  .mirrorbar button{ font-family:var(--mono); font-size:10px; letter-spacing:.1em;
+                     text-transform:uppercase; padding:5px 12px; border:1px solid #3a322f;
+                     background:transparent; color:#8a7d76; cursor:pointer; }
+  .mirrorbar button[aria-pressed="true"]{ background:#cbbfb8; color:var(--panel); border-color:#cbbfb8; }
+  .mirrorbar button:focus-visible{ outline:2px solid var(--copper); outline-offset:2px; }
+  .hexrow{ display:flex; gap:6px; align-items:flex-end; }
+  .hexcell{ flex:1 1 0; min-width:0; }
+  .hexcell svg{ width:100%; height:auto; display:block; }
+  .hexlab{ font-family:var(--mono); font-size:9px; letter-spacing:.1em;
+           color:#6f645f; text-align:center; margin-top:6px; }
+  .paneldec{ margin-top:16px; border-top:1px solid #2b2523; padding-top:12px; }
+  .paneldec .k{ font-family:var(--mono); font-size:9.5px; letter-spacing:.14em;
+                text-transform:uppercase; color:#7d716b; }
+  .paneldec .v{ font-family:var(--mono); font-size:26px; font-weight:700; color:#f0e9e5;
+                letter-spacing:-.02em; line-height:1.2; }
+  .ledrow{ display:flex; gap:6px; margin-top:16px; align-items:center; }
+  .led{ flex:1 1 0; height:9px; background:var(--led-dim); border-radius:1px; }
+  .led.on{ background:var(--led); box-shadow:0 0 7px rgba(255,61,46,.55); }
+  .panelfoot{ font-family:var(--mono); font-size:10.5px; color:#7d716b; margin-top:12px;
+              display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .panelfoot b{ color:#cbbfb8; font-weight:400; }
+
+  /* ---- grade de bits ---- */
+  .trace{ display:flex; flex-direction:column; gap:2px; }
+  .trow{ display:grid; grid-template-columns:118px 1fr; gap:14px; align-items:center; padding:5px 0; }
+  .trow + .trow{ border-top:1px solid var(--rule-soft); }
+  .tname{ font-family:var(--mono); font-size:11px; letter-spacing:.04em; }
+  .tname i{ font-style:normal; color:var(--ink-soft); display:block; font-size:10px;
+            letter-spacing:.1em; text-transform:uppercase; }
+  .bits{ display:flex; gap:3px; align-items:center; }
+  .bit{ width:25px; height:25px; flex:0 0 25px; display:grid; place-items:center;
+        font-family:var(--mono); font-size:12px; border:1px solid var(--rule);
+        background:var(--card); color:var(--ink-soft); }
+  .bit.one{ background:var(--ink); color:var(--card); border-color:var(--ink); }
+  .bit.ghost{ border-style:dashed; opacity:.4; background:transparent; }
+  .bit.carry{ border-color:var(--copper); color:var(--copper); }
+  .bit.carry.one{ background:var(--copper); color:var(--card); }
+  .bit.blank{ border:0; background:transparent; }
+  .bit.pad{ border-color:var(--copper); border-style:dotted; color:var(--copper); }
+  .tnote{ font-family:var(--mono); font-size:10.5px; color:var(--ink-soft);
+          margin-left:6px; white-space:nowrap; }
+  @media (max-width:700px){
+    .trow{ grid-template-columns:1fr; gap:4px; }
+    .bit{ width:22px; height:22px; flex:0 0 22px; font-size:11px; }
+    .bits{ overflow-x:auto; padding-bottom:4px; }
+  }
+
+  .branches{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:14px; }
+  @media (max-width:700px){ .branches{ grid-template-columns:1fr; } }
+  .branch{ border:1px solid var(--rule-soft); padding:9px 11px; background:var(--card);
+           font-family:var(--mono); font-size:11px; color:var(--ink-soft); }
+  .branch b{ display:block; font-size:10px; letter-spacing:.1em; text-transform:uppercase;
+             margin-bottom:3px; }
+  .branch.hot{ border-color:var(--ink); background:var(--ink); color:#b9b5a9; }
+  .branch.hot b{ color:var(--card); }
+
+  .verdict{ display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
+            gap:1px; background:var(--rule-soft); border:1px solid var(--rule-soft); }
+  .vcell{ background:var(--card); padding:13px 14px; }
+  .vcell .k{ font-family:var(--mono); font-size:10px; letter-spacing:.12em;
+             text-transform:uppercase; color:var(--ink-soft); }
+  .vcell .v{ font-family:var(--mono); font-size:19px; letter-spacing:-.02em;
+             margin-top:3px; word-break:break-all; }
+
+  .flags{ display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
+  .flag{ font-family:var(--mono); font-size:11px; padding:6px 10px;
+         border:1px solid var(--rule); color:var(--ink-soft); background:var(--card); }
+  .flag.on{ border-color:var(--copper); color:#fff; background:var(--copper); }
+  .flag.ok{ border-color:var(--green); color:#fff; background:var(--green); }
+
+  table{ width:100%; border-collapse:collapse; font-family:var(--mono); font-size:11.5px; }
+  th{ text-align:left; font-size:10px; letter-spacing:.12em; text-transform:uppercase;
+      color:var(--ink-soft); font-weight:400; padding:0 10px 8px 0;
+      border-bottom:1px solid var(--rule); }
+  td{ padding:8px 10px 8px 0; border-bottom:1px solid var(--rule-soft); vertical-align:top; }
+  tr.vec{ cursor:pointer; }
+  tr.vec:hover td{ background:var(--card); }
+  tr.vec:focus-visible{ outline:2px solid var(--copper); }
+  .tag{ font-size:10px; color:var(--copper); }
+
+  .copyrow{ display:flex; gap:8px; margin-top:16px; align-items:stretch; flex-wrap:wrap; }
+  .copyrow input{ flex:1 1 340px; font-family:var(--mono); font-size:11.5px; padding:9px 11px;
+                  border:1px solid var(--rule); background:var(--card); color:var(--ink); }
+  .copyrow button{ font-family:var(--mono); font-size:11px; letter-spacing:.1em;
+                   text-transform:uppercase; padding:9px 16px; border:1px solid var(--ink);
+                   background:var(--ink); color:var(--card); cursor:pointer; }
+  .copyrow button:focus-visible{ outline:2px solid var(--copper); outline-offset:2px; }
+
+  footer{ margin-top:44px; padding-top:16px; border-top:1px solid var(--rule);
+          font-size:12px; color:var(--ink-soft); }
+  code{ font-family:var(--mono); font-size:.92em; }
+  @media (prefers-reduced-motion:reduce){ *{ transition:none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="eyebrow">DE10-Lite · fp_adder · modelo bit a bit</p>
+  <h1>Banca de depuração</h1>
+  <p class="lede">
+    Reproduz o <b>fp_adder.vhd</b> exatamente como está escrito — o truncamento no alinhamento,
+    o descarte quando o resultado não normaliza, o estouro do expoente. O que aparece aqui é o
+    que a placa vai mostrar, não a resposta matematicamente ideal.
+  </p>
+
+  <section class="band" style="border-top:0; padding-top:0; margin-top:0">
+    <div class="band-head">
+      <span class="band-num">⇢</span>
+      <h2 class="band-title">Decimal para chaves</h2>
+      <span class="band-note">digite o número que você quer e veja como entrá-lo</span>
+    </div>
+    <div class="conv">
+      <div class="convrow">
+        <input type="text" id="convin" placeholder="ex.: 70.5, -11.25, 3.14, 1/3, 2^10"
+               aria-label="Número decimal a converter" autocomplete="off">
+        <button class="convbtn" id="convgo">Converter</button>
+        <button class="convbtn ghost" id="convop1">→ operando 1</button>
+        <button class="convbtn ghost" id="convop2">→ operando 2</button>
+      </div>
+      <div class="chips" id="convchips"></div>
+      <div class="convout" id="convout"></div>
+      <div class="steps" id="convsteps"></div>
+    </div>
+  </section>
+
+  <div class="split" style="margin-top:26px">
+    <div>
+      <div class="cols">
+        <div class="card" id="card1"></div>
+        <div class="card" id="card2"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="mirrorbar">
+        <span>SW7 vista</span>
+        <button id="v-op" aria-pressed="false">operando</button>
+        <button id="v-res" aria-pressed="true">resultado</button>
+        <span style="margin-left:6px">SW9</span>
+        <button id="mir0" aria-pressed="true">op1</button>
+        <button id="mir1" aria-pressed="false">op2</button>
+      </div>
+      <div class="hexrow" id="hexrow"></div>
+      <div class="paneldec">
+        <div class="k">valor no display</div>
+        <div class="v" id="paneldec">—</div>
+      </div>
+      <div class="ledrow" id="ledrow"></div>
+      <div class="panelfoot">
+        <span>LEDR9 sinal · LEDR8 estouro · LEDR7 vista · LEDR6:0 eco</span>
+        <span id="segbytes"></span>
+      </div>
+    </div>
+  </div>
+
+  <section class="band">
+    <div class="band-head">
+      <span class="band-num">01 / 02</span>
+      <h2 class="band-title">Ordenar e alinhar</h2>
+      <span class="band-note" id="sortnote"></span>
+    </div>
+    <div class="trace" id="trace-a"></div>
+  </section>
+
+  <section class="band">
+    <div class="band-head">
+      <span class="band-num">03 / 04</span>
+      <h2 class="band-title">Somar e normalizar</h2>
+      <span class="band-note" id="opnote"></span>
+    </div>
+    <div class="trace" id="trace-b"></div>
+    <div class="branches" id="branches"></div>
+  </section>
+
+  <section class="band">
+    <div class="band-head">
+      <span class="band-num">→</span>
+      <h2 class="band-title">Veredito</h2>
+      <span class="band-note">valor = (−1)<sup>s</sup> × (frac / 256) × 2<sup>exp</sup></span>
+    </div>
+    <div class="verdict" id="verdict"></div>
+    <div class="flags" id="flags"></div>
+    <div class="copyrow">
+      <input id="tbline" readonly aria-label="Linha para o testbench">
+      <button id="copybtn">Copiar</button>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="band-head">
+      <span class="band-num">↺</span>
+      <h2 class="band-title">Vetores do testbench</h2>
+      <span class="band-note">clique para carregar</span>
+    </div>
+    <table>
+      <thead>
+        <tr><th style="width:42%">Caso</th><th>op1</th><th>op2</th><th>Exercita</th></tr>
+      </thead>
+      <tbody id="vectors"></tbody>
+    </table>
+  </section>
+
+  <footer>
+    A fração é sempre <code>'1' &amp; SW(6:0)</code> — não existe como digitar um operando fora
+    do formato. <code>SW(9:8)</code> escolhe o campo, <code>SW(7)</code> a vista,
+    <code>KEY0</code> carrega. O <code>C</code> do HEX5 significa que o expoente verdadeiro é o
+    do HEX2 mais 16.
+  </footer>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ================================================================
+     modelo — espelho fiel de fp_adder.vhd
+     ================================================================ */
+  function fpAdd(a, b){
+    const ka = (a.exp << 8) | a.frac;
+    const kb = (b.exp << 8) | b.frac;
+    const firstBigger = ka > kb;
+    const big   = firstBigger ? a : b;
+    const small = firstBigger ? b : a;
+
+    const expDiff = (big.exp - small.exp) & 0xF;
+    const fraca   = expDiff <= 7 ? (small.frac >>> expDiff) : 0;
+
+    const sameSign = big.sign === small.sign;
+    const sum = (sameSign ? big.frac + fraca : big.frac - fraca) & 0x1FF;
+
+    let leado = 7;
+    for(let i = 0; i < 7; i++){
+      if((sum >>> (7 - i)) & 1){ leado = i; break; }
+    }
+    const sumNorm = (sum << leado) & 0xFF;
+
+    let expn, fracn, branch;
+    if((sum >>> 8) & 1){
+      expn = (big.exp + 1) & 0xF;
+      fracn = (sum >>> 1) & 0xFF;
+      branch = "carry";
+    }else if(leado > big.exp){
+      expn = 0; fracn = 0;
+      branch = "zero";
+    }else{
+      expn = (big.exp - leado) & 0xF;
+      fracn = sumNorm;
+      branch = "norm";
+    }
+
+    // estouro deduzido igual ao demo: mesmos sinais, algum exp em 15, exp_out zerou
+    const ovf = sameSign && (a.exp === 15 || b.exp === 15) && expn === 0;
+
+    return { firstBigger, big, small, expDiff, fraca, sameSign,
+             sum, leado, sumNorm, branch, ovf,
+             out: { sign: big.sign, exp: expn, frac: fracn } };
+  }
+
+  // valor guardado nos registradores (sem o C)
+  const val = o => (o.sign ? -1 : 1) * (o.frac / 256) * Math.pow(2, o.exp);
+  // valor que a placa comunica, somando 16 ao expoente quando o C acende
+  const valDisplay = (o, ovf) =>
+    (o.sign ? -1 : 1) * (o.frac / 256) * Math.pow(2, o.exp + (ovf ? 16 : 0));
+
+  const hex2 = v => v.toString(16).toUpperCase().padStart(2, "0");
+  const bin = (v, n) => v.toString(2).padStart(n, "0");
+
+  function fmtNum(x){
+    if(x === 0) return "0";
+    const a = Math.abs(x);
+    if(a >= 1e7 || a < 1e-5) return x.toExponential(4);
+    return x.toFixed(8).replace(/0+$/, "").replace(/\.$/, "");
+  }
+  const SUP = { "-":"\u207b","0":"\u2070","1":"\u00b9","2":"\u00b2","3":"\u00b3",
+                "4":"\u2074","5":"\u2075","6":"\u2076","7":"\u2077","8":"\u2078","9":"\u2079" };
+  const sup = n => String(n).split("").map(c => SUP[c] || c).join("");
+
+  /* ================================================================
+     conversor decimal -> formato
+     ================================================================ */
+  const FRAC_MIN = 128, FRAC_MAX = 255, EXP_MAX = 15;
+  const VAL_MIN = FRAC_MIN / 256;                            // 0.5
+  const VAL_MAX = FRAC_MAX / 256 * Math.pow(2, EXP_MAX);     // 32640
+
+  function parseNumero(txt){
+    const s = String(txt).trim().replace(",", ".");
+    if(!s) return null;
+    if(/^-?\d+(\.\d+)?$/.test(s)) return parseFloat(s);
+    // fracao a/b
+    let m = s.match(/^(-?\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/);
+    if(m){ const d = parseFloat(m[2]); return d === 0 ? null : parseFloat(m[1]) / d; }
+    // potencia a^b
+    m = s.match(/^(-?\d+(?:\.\d+)?)\s*(?:\^|\*\*)\s*(-?\d+)$/);
+    if(m) return Math.pow(parseFloat(m[1]), parseInt(m[2], 10));
+    // hexadecimal 0x..
+    if(/^-?0x[0-9a-f]+$/i.test(s)) return parseInt(s, 16);
+    const v = Number(s);
+    return isFinite(v) ? v : null;
+  }
+
+  function toFP(x){
+    if(x === null || !isFinite(x)) return null;
+    const neg = x < 0;
+    const a = Math.abs(x);
+
+    if(a === 0) return { sign:0, exp:0, frac:0, val:0, exact:true, caso:"zero" };
+    if(a < VAL_MIN) return { sign:neg?1:0, exp:0, frac:0, val:0, exact:false, caso:"underflow" };
+    if(a > VAL_MAX) return { sign:neg?1:0, exp:EXP_MAX, frac:FRAC_MAX,
+                             val:(neg?-1:1)*VAL_MAX, exact:false, caso:"overflow" };
+
+    let best = null;
+    for(let e = 0; e <= EXP_MAX; e++){
+      const ideal = a / Math.pow(2, e) * 256;
+      for(const c of [Math.floor(ideal), Math.ceil(ideal)]){
+        if(c < FRAC_MIN || c > FRAC_MAX) continue;
+        const err = Math.abs(c / 256 * Math.pow(2, e) - a);
+        if(!best || err < best.err) best = { exp:e, frac:c, err:err };
+      }
+    }
+    if(!best) return { sign:neg?1:0, exp:0, frac:0, val:0, exact:false, caso:"underflow" };
+
+    const v = (neg ? -1 : 1) * best.frac / 256 * Math.pow(2, best.exp);
+    return { sign:neg?1:0, exp:best.exp, frac:best.frac, val:v,
+             exact:best.err === 0, err:best.err, caso:"ok" };
+  }
+
+  /* ================================================================
+     estado
+     ================================================================ */
+  let vistaResultado = true;   // SW7
+  let espelho = 0;             // SW9
+  let ultimaConv = null;
+
+  const ops = [
+    { sign:0, exp:1, frac:0x80 },
+    { sign:0, exp:1, frac:0x80 }
+  ];
+  const norm = o => { o.frac = 0x80 | (o.frac & 0x7F); };
+
+  /* ================================================================
+     conversor: interface
+     ================================================================ */
+  const EXEMPLOS = ["1", "0.5", "70.5", "-11.25", "3.14159", "100", "1/3", "2^15", "0.25", "65280"];
+
+  function renderChips(){
+    document.getElementById("convchips").innerHTML =
+      EXEMPLOS.map(e => '<button class="chip" type="button" data-v="' + e + '">' + e + "</button>").join("");
+    document.querySelectorAll(".chip").forEach(c =>
+      c.addEventListener("click", () => {
+        document.getElementById("convin").value = c.dataset.v;
+        converter();
+      }));
+  }
+
+  function passoTexto(campo, dado, oque){
+    const bits = bin(dado, 7);
+    return '<div class="step"><span class="stepn">' + (campo + 1) + "</span>" +
+           '<span class="stepsw">SW9:8 = <b>' + bin(campo, 2) + "</b>" +
+           " &nbsp; SW6:0 = <b>" + bits + "</b> &nbsp;<em>KEY0</em></span>" +
+           '<span class="stepwhat">' + oque + "</span></div>";
+  }
+
+  function converter(){
+    const txt = document.getElementById("convin").value;
+    const out = document.getElementById("convout");
+    const steps = document.getElementById("convsteps");
+    const x = parseNumero(txt);
+
+    if(x === null){
+      ultimaConv = null;
+      out.innerHTML = '<div class="convval dim">—</div>' +
+        '<div class="convwhy">não entendi o número. aceito 70.5 · -11,25 · 1/3 · 2^10 · 0xFF</div>';
+      steps.innerHTML = "";
+      return;
+    }
+
+    const r = toFP(x);
+    ultimaConv = r;
+
+    let tag = "", why = "";
+    if(r.caso === "overflow"){
+      tag = '<span class="convtag fora">acima do máximo representável</span>';
+      why = "o maior valor do formato é 32640 &nbsp;(0xFF/256 × 2" + sup(15) + ")";
+    }else if(r.caso === "underflow"){
+      tag = '<span class="convtag fora">abaixo do mínimo representável</span>';
+      why = "a menor magnitude normalizada é 0,5 &nbsp;(0x80/256 × 2" + sup(0) +
+            ") — qualquer coisa menor vira zero";
+    }else if(r.caso === "zero"){
+      tag = '<span class="convtag exato">zero</span>';
+      why = "expoente e fração em zero";
+    }else if(r.exact){
+      tag = '<span class="convtag exato">exato</span>';
+      why = (r.sign ? "\u2212" : "") + "(0x" + hex2(r.frac) + " / 256) \u00d7 2" + sup(r.exp);
+    }else{
+      const erroRel = Math.abs(r.err / Math.abs(x)) * 100;
+      tag = '<span class="convtag aprox">aproximado</span>';
+      why = (r.sign ? "\u2212" : "") + "(0x" + hex2(r.frac) + " / 256) \u00d7 2" + sup(r.exp) +
+            " &nbsp;·&nbsp; erro " + fmtNum(r.err) +
+            " (" + erroRel.toFixed(3) + "%)";
+    }
+
+    out.innerHTML = '<div class="convval">' + fmtNum(r.val) + "</div>" +
+                    '<div class="convwhy">' + why + "</div>" + tag;
+
+    // sequencia de chaves, para op1 e op2
+    const cab = (r.sign ? 16 : 0) | (r.exp & 0xF);
+    const dadoFrac = r.frac & 0x7F;
+    let h = "";
+    h += passoTexto(0, cab, "sinal " + (r.sign ? "\u2212" : "+") + " e exp " + r.exp + " do op1");
+    h += passoTexto(1, dadoFrac, "frac 0x" + hex2(r.frac) + " do op1");
+    h += passoTexto(2, cab, "sinal " + (r.sign ? "\u2212" : "+") + " e exp " + r.exp + " do op2");
+    h += passoTexto(3, dadoFrac, "frac 0x" + hex2(r.frac) + " do op2");
+    steps.innerHTML = h;
+  }
+
+  function aplicar(idx){
+    if(!ultimaConv) converter();
+    if(!ultimaConv) return;
+    ops[idx] = { sign:ultimaConv.sign, exp:ultimaConv.exp, frac:ultimaConv.frac };
+    render();
+  }
+
+  /* ================================================================
+     chaves dos operandos
+     ================================================================ */
+  function switchEl(label, on, locked, onToggle){
+    const b = document.createElement("button");
+    b.className = "sw"; b.type = "button";
+    b.setAttribute("aria-pressed", on ? "true" : "false");
+    b.setAttribute("aria-label", label + " = " + (on ? 1 : 0));
+    if(locked) b.disabled = true;
+    b.innerHTML = '<span class="knob"></span><span class="val">' + (on ? 1 : 0) +
+                  '</span><span class="idx">' + label + '</span>';
+    if(!locked) b.addEventListener("click", onToggle);
+    return b;
+  }
+
+  function buildCard(idx){
+    const host = document.getElementById("card" + (idx + 1));
+    const o = ops[idx];
+    host.innerHTML = "";
+
+    const h = document.createElement("h3");
+    h.textContent = "Operando " + (idx + 1);
+    host.appendChild(h);
+    const sub = document.createElement("p");
+    sub.className = "sub";
+    sub.textContent = idx === 0 ? "campos 00 e 01" : "campos 10 e 11";
+    host.appendChild(sub);
+
+    const f1 = document.createElement("div");
+    f1.className = "field";
+    f1.innerHTML = '<span class="flabel">sinal · SW4</span>';
+    const sb = document.createElement("button");
+    sb.type = "button";
+    sb.className = "signbtn" + (o.sign ? " neg" : "");
+    sb.textContent = o.sign ? "\u2212" : "+";
+    sb.setAttribute("aria-label", "sinal " + (o.sign ? "negativo" : "positivo"));
+    sb.addEventListener("click", () => { o.sign ^= 1; render(); });
+    f1.appendChild(sb);
+    host.appendChild(f1);
+
+    const f2 = document.createElement("div");
+    f2.className = "field";
+    f2.innerHTML = '<span class="flabel">exp · SW3:0</span>';
+    const r2 = document.createElement("div");
+    r2.className = "switches";
+    for(let i = 3; i >= 0; i--){
+      r2.appendChild(switchEl("SW" + i, (o.exp >>> i) & 1, false,
+        () => { o.exp ^= (1 << i); render(); }));
+    }
+    f2.appendChild(r2);
+    const rb2 = document.createElement("div");
+    rb2.className = "readback";
+    rb2.innerHTML = "= <b>" + o.exp + "</b>  ·  2" + sup(o.exp);
+    f2.appendChild(rb2);
+    host.appendChild(f2);
+
+    const f3 = document.createElement("div");
+    f3.className = "field";
+    f3.innerHTML = '<span class="flabel">frac · \'1\' &amp; SW6:0</span>';
+    const r3 = document.createElement("div");
+    r3.className = "switches";
+    for(let i = 7; i >= 0; i--){
+      const locked = i === 7;
+      r3.appendChild(switchEl(locked ? "1" : "SW" + i, (o.frac >>> i) & 1, locked,
+        () => { o.frac ^= (1 << i); render(); }));
+      if(i === 7){
+        const g = document.createElement("span");
+        g.className = "sw-gap";
+        r3.appendChild(g);
+      }
+    }
+    f3.appendChild(r3);
+    const rb3 = document.createElement("div");
+    rb3.className = "readback";
+    rb3.innerHTML = "= <b>0x" + hex2(o.frac) + "</b>  ·  valor <b>" + fmtNum(val(o)) + "</b>";
+    f3.appendChild(rb3);
+    host.appendChild(f3);
+  }
+
+  /* ================================================================
+     displays
+     ================================================================ */
+  const SEG = [0x40,0x79,0x24,0x30,0x19,0x12,0x02,0x78,
+               0x00,0x10,0x08,0x03,0x27,0x21,0x06,0x0E];
+  const SEG_APAGADO = 0x7F, SEG_MENOS = 0x3F, SEG_C = 0x27;
+  const POLY = {
+    a:"17,3 83,3 90,10 83,17 17,17 10,10",
+    b:"83,17 90,10 97,17 97,83 90,90 83,83",
+    c:"83,97 90,90 97,97 97,163 90,170 83,163",
+    d:"17,163 83,163 90,170 83,177 17,177 10,170",
+    e:"3,97 10,90 17,97 17,163 10,170 3,163",
+    f:"3,17 10,10 17,17 17,83 10,90 3,83",
+    g:"17,83 83,83 90,90 83,97 17,97 10,90"
+  };
+  const ORDER = ["a","b","c","d","e","f","g"];
+
+  function digitSVG(pat7, dpOn){
+    let p = "";
+    ORDER.forEach((s, i) => {
+      const lit = ((pat7 >>> i) & 1) === 0;
+      p += '<polygon points="' + POLY[s] + '" fill="' + (lit ? "var(--led)" : "var(--led-dim)") + '"/>';
+    });
+    p += '<circle cx="108" cy="170" r="8" fill="' + (dpOn ? "var(--led)" : "var(--led-dim)") + '"/>';
+    return '<svg viewBox="-6 -6 132 194" role="img" aria-hidden="true">' +
+           '<g transform="skewX(-5)">' + p + '</g></svg>';
+  }
+
+  function renderPanel(r){
+    const mostrando = vistaResultado ? r.out : ops[espelho];
+    const carryVisivel = vistaResultado && r.ovf;
+
+    const cells = [
+      { pat:carryVisivel ? SEG_C : SEG_APAGADO, dp:false, lab:"HEX5" },
+      { pat:SEG_APAGADO,                        dp:false, lab:"HEX4" },
+      { pat:mostrando.sign ? SEG_MENOS : SEG_APAGADO, dp:false, lab:"HEX3" },
+      { pat:SEG[mostrando.exp & 0xF],           dp:true,  lab:"HEX2" },
+      { pat:SEG[(mostrando.frac >>> 4) & 0xF],  dp:false, lab:"HEX1" },
+      { pat:SEG[mostrando.frac & 0xF],          dp:false, lab:"HEX0" }
+    ];
+
+    document.getElementById("hexrow").innerHTML = cells.map(c =>
+      '<div class="hexcell">' + digitSVG(c.pat, c.dp) +
+      '<div class="hexlab">' + c.lab + "</div></div>").join("");
+
+    document.getElementById("segbytes").innerHTML = cells.map(c =>
+      "<b>" + c.lab.slice(3) + ":" + hex2((c.dp ? 0 : 0x80) | c.pat) + "</b>").join("&nbsp; ");
+
+    // leitura decimal do que está na tela, com o C somando 16
+    const v = valDisplay(mostrando, carryVisivel);
+    const expEfetivo = mostrando.exp + (carryVisivel ? 16 : 0);
+    document.getElementById("paneldec").innerHTML =
+      fmtNum(v) + (carryVisivel
+        ? ' <span style="font-size:12px;color:#a96a2e">C: exp ' + mostrando.exp +
+          "+16 = " + expEfetivo + "</span>" : "");
+
+    const leds = [];
+    for(let i = 9; i >= 0; i--){
+      let on;
+      if(i === 9) on = r.out.sign === 1;
+      else if(i === 8) on = r.ovf;
+      else if(i === 7) on = vistaResultado;
+      else on = ((ops[espelho].frac >>> i) & 1) === 1;
+      leds.push('<div class="led' + (on ? " on" : "") + '" title="LEDR' + i + '"></div>');
+    }
+    document.getElementById("ledrow").innerHTML = leds.join("");
+  }
+
+  /* ================================================================
+     grade de bits
+     ================================================================ */
+  function bitRow(o){
+    const cells = (o.cells || []).map(c => {
+      const cls = ["bit"];
+      if(c.blank) cls.push("blank");
+      if(c.ghost) cls.push("ghost");
+      if(c.carry) cls.push("carry");
+      if(c.pad) cls.push("pad");
+      if(c.v === 1) cls.push("one");
+      return '<span class="' + cls.join(" ") + '">' + (c.blank ? "" : c.v) + "</span>";
+    });
+    return '<div class="trow"><div class="tname">' + o.name +
+           (o.sub ? "<i>" + o.sub + "</i>" : "") + "</div>" +
+           '<div class="bits">' + cells.join("") +
+           (o.note ? '<span class="tnote">' + o.note + "</span>" : "") + "</div></div>";
+  }
+  function cellsFrom(v, n, extra){
+    const out = [];
+    for(let i = n - 1; i >= 0; i--) out.push(Object.assign({ v:(v >>> i) & 1 }, extra && extra(i) || {}));
+    return out;
+  }
+
+  function renderTrace(r){
+    const blank = { blank:true, v:0 };
+    let html = "";
+    html += bitRow({ name:"fracb", sub:"maior", cells:[blank].concat(cellsFrom(r.big.frac, 8)),
+                     note:"exp " + r.big.exp + " · " + (r.big.sign ? "\u2212" : "+") });
+    html += bitRow({ name:"fracs", sub:"menor", cells:[blank].concat(cellsFrom(r.small.frac, 8)),
+                     note:"exp " + r.small.exp + " · " + (r.small.sign ? "\u2212" : "+") });
+
+    const d = Math.min(r.expDiff, 8);
+    const ac = [blank];
+    for(let i = 7; i >= 0; i--) ac.push({ v:(r.fraca >>> i) & 1, pad:(7 - i) < d });
+    for(let k = d - 1; k >= 0; k--) ac.push({ v:(r.small.frac >>> k) & 1, ghost:true });
+    html += bitRow({ name:"fraca", sub:"alinhado", cells:ac,
+      note:"\u00bb " + r.expDiff + (r.expDiff > 7 ? " (zera tudo)" : "") +
+           (d > 0 ? " · descarta " + d + " bit" + (d > 1 ? "s" : "") : " · sem perda") });
+    document.getElementById("trace-a").innerHTML = html;
+
+    document.getElementById("sortnote").textContent =
+      r.firstBigger ? "operando 1 é o maior"
+                    : "operando 2 é o maior (ou empate — o VHDL usa \">\" estrito)";
+
+    let h2 = "";
+    h2 += bitRow({ name:"sum", sub:r.sameSign ? "fracb + fraca" : "fracb \u2212 fraca",
+      cells:cellsFrom(r.sum, 9, i => i === 8 ? { carry:true } : null),
+      note:"0x" + r.sum.toString(16).toUpperCase().padStart(3, "0") +
+           ((r.sum >>> 8) & 1 ? " · carry!" : "") });
+    h2 += bitRow({ name:"leado", sub:"zeros à esq.",
+      cells:[blank].concat(cellsFrom(r.sum & 0xFF, 8, i => (7 - i) < r.leado ? { ghost:true } : null)),
+      note:"= " + r.leado });
+
+    if(r.branch === "carry"){
+      const cc = [blank];
+      for(let i = 7; i >= 0; i--) cc.push({ v:(r.out.frac >>> i) & 1, pad:i === 7 });
+      cc.push({ v:r.sum & 1, ghost:true });
+      h2 += bitRow({ name:"fracn", sub:"sum \u00bb 1", cells:cc,
+        note:"exp " + r.big.exp + " + 1" + (r.ovf ? " = 16, não cabe \u2192 C" : "") });
+    }else if(r.branch === "zero"){
+      h2 += bitRow({ name:"fracn", sub:"forçado a 0", cells:[blank].concat(cellsFrom(0, 8)),
+        note:"leado (" + r.leado + ") > expb (" + r.big.exp + ")" });
+    }else{
+      const nc = [blank];
+      for(let i = 7; i >= 0; i--) nc.push({ v:(r.out.frac >>> i) & 1, pad:i < r.leado });
+      h2 += bitRow({ name:"fracn", sub:"sum \u00ab " + r.leado, cells:nc,
+        note:"exp " + r.big.exp + " \u2212 " + r.leado + " = " + r.out.exp });
+    }
+    document.getElementById("trace-b").innerHTML = h2;
+
+    document.getElementById("opnote").textContent =
+      r.sameSign ? "sinais iguais \u2192 soma" : "sinais diferentes \u2192 subtração";
+
+    const br = [
+      { k:"carry", t:"sum(8) = 1", d:"expn = expb + 1 · fracn = sum(8:1)" },
+      { k:"zero",  t:"leado > expb", d:"expn = 0 · fracn = 0" },
+      { k:"norm",  t:"caso geral", d:"expn = expb \u2212 leado · fracn = sum \u00ab leado" }
+    ];
+    document.getElementById("branches").innerHTML = br.map(b =>
+      '<div class="branch' + (r.branch === b.k ? " hot" : "") + '"><b>' + b.t + "</b>" + b.d + "</div>"
+    ).join("");
+  }
+
+  /* ================================================================
+     veredito
+     ================================================================ */
+  function renderVerdict(r){
+    const exact = val(ops[0]) + val(ops[1]);
+    const got = valDisplay(r.out, r.ovf);
+    const err = Math.abs(got - exact);
+    const ulp = Math.pow(2, r.out.exp + (r.ovf ? 16 : 0)) / 256;
+
+    document.getElementById("verdict").innerHTML = [
+      ["soma exata (real)", fmtNum(exact)],
+      ["o que a placa comunica", fmtNum(got)],
+      ["erro absoluto", fmtNum(err) + (ulp ? "  (" + (err / ulp).toFixed(2) + " ULP)" : "")],
+      ["saída", (r.out.sign ? "\u2212" : "+") + " exp=" +
+                (r.out.exp + (r.ovf ? 16 : 0)) + (r.ovf ? " (C)" : "") +
+                " frac=0x" + hex2(r.out.frac)]
+    ].map(p => '<div class="vcell"><div class="k">' + p[0] + '</div><div class="v">' +
+               p[1] + "</div></div>").join("");
+
+    const F = [
+      { on:r.ovf, txt:"expoente estourou \u2014 C no HEX5, some 16" },
+      { on:r.branch === "zero", txt:"resultado descartado: virou zero" },
+      { on:r.out.frac === 0 && r.out.sign === 1, txt:"zero negativo \u2014 traço no HEX3" },
+      { on:r.expDiff > 7, txt:"menor operando some no alinhamento" }
+    ].filter(f => f.on);
+
+    document.getElementById("flags").innerHTML = F.length
+      ? F.map(f => '<span class="flag on">' + f.txt + "</span>").join("")
+      : '<span class="flag ok">nenhuma condição de borda neste caso</span>';
+
+    const l = o => "'" + o.sign + "', " + o.exp + ", 16#" + hex2(o.frac) + "#";
+    document.getElementById("tbline").value =
+      'do_test("caso", ' + l(ops[0]) + ", " + l(ops[1]) + ")" +
+      (r.ovf ? ", espera_carry => true);" : ";");
+  }
+
+  /* ================================================================
+     vetores
+     ================================================================ */
+  const VECTORS = [
+    ["T1 · 1,0 + 1,0",            [0,1,0x80], [0,1,0x80], "potência de dois"],
+    ["T2 · 1,0 + 0,5",            [0,1,0x80], [0,0,0x80], "metade exata"],
+    ["T3 · 2,0 − 1,0",            [0,2,0x80], [1,1,0x80], "normaliza 1 casa"],
+    ["T4 · resultado negativo",   [0,1,0x80], [1,3,0xC0], "traço no HEX3"],
+    ["T5 · expoentes diferentes", [0,6,0xFF], [0,3,0xE0], "alinhamento + carry"],
+    ["T6 · cancelamento total",   [0,4,0xF0], [1,4,0xF0], "zero"],
+    ["T7 · underflow",            [0,2,0xFF], [1,2,0xFE], "vira zero"],
+    ["T8 · estouro do expoente",  [0,15,0xFF],[0,15,0xFF],"C no HEX5"],
+    ["T9 · estouro, exp difs.",   [0,15,0xFF],[0,14,0xFF],"C no HEX5"],
+    ["T10 · reinício do KEY1",    [0,1,0x80], [0,1,0x80], "autoteste: 2,0"]
+  ];
+
+  function renderVectors(){
+    document.getElementById("vectors").innerHTML = VECTORS.map((v, i) =>
+      '<tr class="vec" tabindex="0" data-i="' + i + '"><td>' + v[0] + "</td>" +
+      "<td>" + (v[1][0] ? "\u2212" : "+") + " e" + v[1][1] + " 0x" + hex2(v[1][2]) + "</td>" +
+      "<td>" + (v[2][0] ? "\u2212" : "+") + " e" + v[2][1] + " 0x" + hex2(v[2][2]) + "</td>" +
+      '<td class="tag">' + v[3] + "</td></tr>").join("");
+
+    const load = i => {
+      const v = VECTORS[i];
+      ops[0] = { sign:v[1][0], exp:v[1][1], frac:v[1][2] };
+      ops[1] = { sign:v[2][0], exp:v[2][1], frac:v[2][2] };
+      vistaResultado = true; syncVista();
+      render();
+      window.scrollTo({ top:0, behavior:"smooth" });
+    };
+    document.querySelectorAll("tr.vec").forEach(tr => {
+      tr.addEventListener("click", () => load(+tr.dataset.i));
+      tr.addEventListener("keydown", e => {
+        if(e.key === "Enter" || e.key === " "){ e.preventDefault(); load(+tr.dataset.i); }
+      });
+    });
+  }
+
+  /* ================================================================
+     controles
+     ================================================================ */
+  function syncVista(){
+    document.getElementById("v-op").setAttribute("aria-pressed", vistaResultado ? "false" : "true");
+    document.getElementById("v-res").setAttribute("aria-pressed", vistaResultado ? "true" : "false");
+  }
+  function syncMirror(){
+    document.getElementById("mir0").setAttribute("aria-pressed", espelho === 0 ? "true" : "false");
+    document.getElementById("mir1").setAttribute("aria-pressed", espelho === 1 ? "true" : "false");
+  }
+
+  document.getElementById("v-op").addEventListener("click", () => { vistaResultado = false; syncVista(); render(); });
+  document.getElementById("v-res").addEventListener("click", () => { vistaResultado = true; syncVista(); render(); });
+  document.getElementById("mir0").addEventListener("click", () => { espelho = 0; syncMirror(); if(!vistaResultado) render(); else render(); });
+  document.getElementById("mir1").addEventListener("click", () => { espelho = 1; syncMirror(); render(); });
+
+  document.getElementById("convgo").addEventListener("click", converter);
+  document.getElementById("convin").addEventListener("input", converter);
+  document.getElementById("convin").addEventListener("keydown", e => {
+    if(e.key === "Enter"){ e.preventDefault(); converter(); }
+  });
+  document.getElementById("convop1").addEventListener("click", () => aplicar(0));
+  document.getElementById("convop2").addEventListener("click", () => aplicar(1));
+
+  document.getElementById("copybtn").addEventListener("click", () => {
+    const el = document.getElementById("tbline");
+    el.select();
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch(e) { ok = false; }
+    if(!ok && navigator.clipboard) navigator.clipboard.writeText(el.value).catch(() => {});
+    const b = document.getElementById("copybtn");
+    b.textContent = "Copiado";
+    setTimeout(() => { b.textContent = "Copiar"; }, 1200);
+  });
+
+  function render(){
+    ops.forEach(norm);
+    const r = fpAdd(ops[0], ops[1]);
+    buildCard(0); buildCard(1);
+    renderPanel(r);
+    renderTrace(r);
+    renderVerdict(r);
+  }
+
+  syncVista(); syncMirror(); renderChips(); renderVectors();
+  document.getElementById("convin").value = "70.5";
+  converter();
+  render();
+})();
+</script>
+</body>
+</html>

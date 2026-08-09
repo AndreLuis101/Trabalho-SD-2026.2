@@ -7,7 +7,6 @@
 *.done
 *.eqn
 *.hex
-*.html
 *.jdi
 *.jpg
 # *.mif
@@ -23,7 +22,6 @@
 *.sopc_builder
 *.summary
 *.tcl
-*.txt
 *~
 *example*
 *sopc_*

@@ -438,17 +438,70 @@ begin
 
         wait for 5 * CLK_PERIOD;
 
-        do_test("EG1", '0', 3, 16#8A#,
-                       '1', 4, 16#DF#);
+        ------------------------------------------------------------------
+        -- Table 1 do livro, traduzida mantendo o expoente e escolhendo a
+        -- fracao normalizada mais proxima:
+        --     0.54 -> 0x8A    0.87 -> 0xDF    0.55 -> 0x8D
+        --     0.56 -> 0x8F    0.52 -> 0x85
+        ------------------------------------------------------------------
 
-        do_test("EG2", '0', 3, 16#8A#,
-                       '1', 3, 16#8D#);
+        do_test("EG1 : +0.54E3 + (-0.87E4)   alinha 1 casa, subtrai, fica em E4",
+                '0', 3, 16#8A#,
+                '1', 4, 16#DF#);
 
-        do_test("EG3", '0', 0, 16#8A#,
-                       '1', 0, 16#8D#);
+        do_test("EG2 : +0.54E3 + (-0.55E3)   cancelamento: precisa de 6 bits, so ha 3 de expoente",
+                '0', 3, 16#8A#,
+                '1', 3, 16#8D#);
 
-        do_test("EG4", '0', 3, 16#8F#,
-                       '0', 3, 16#85#);
+        do_test("EG3 : +0.54E0 + (-0.55E0)   expoente no minimo, vira zero negativo",
+                '0', 0, 16#8A#,
+                '1', 0, 16#8D#);
+
+        do_test("EG4 : +0.56E3 + (+0.52E3)   vai-um, expoente sobe para E4",
+                '0', 3, 16#8F#,
+                '0', 3, 16#85#);
+
+        ------------------------------------------------------------------
+        -- Casos complementares: cobrem os ramos que a Table 1 nao alcanca
+        ------------------------------------------------------------------
+
+        -- caso II da normalizacao: mesmo par do EG2, agora com expoente
+        -- sobrando. leado = 6 e expb = 6, entao o deslocamento a esquerda
+        -- e pago e o resultado sai exato em -0,75
+        do_test("T5  : +0.54E6 + (-0.55E6)   expoente suficiente: renormaliza para -0,75",
+                '0', 6, 16#8A#,
+                '1', 6, 16#8D#);
+
+        -- potencias de dois, so possiveis porque apenas o bit 7 e forcado
+        do_test("T6  : 1,0 + 0,5             potencias de dois, resultado exato 1,5",
+                '0', 1, 16#80#,
+                '0', 0, 16#80#);
+
+        -- ordenacao inversa: aqui o operando 1 e o maior, e o sinal dele
+        -- e que prevalece na saida
+        do_test("T7  : -24 + 4               operando 1 e o maior, subtrai e mantem o sinal",
+                '1', 5, 16#C0#,
+                '0', 3, 16#80#);
+
+        -- exp_diff = 15: o alinhamento desloca alem dos 8 bits e a fracao
+        -- do operando pequeno e inteiramente descartada
+        do_test("T8  : 16384 + 0,996         exp_diff=15, o operando pequeno e absorvido",
+                '0', 15, 16#80#,
+                '0',  0, 16#FF#);
+
+        -- cancelamento total com expb >= 7: leado = 7 nao supera expb, o
+        -- ramo geral assume e devolve zero com expoente 5 (zero nao
+        -- canonico, limitacao conhecida do somador)
+        do_test("T9  : a + (-a) com exp=12   cancelamento total: zero com expoente 5",
+                '0', 12, 16#C0#,
+                '1', 12, 16#C0#);
+
+        -- unico caso em que o expoente verdadeiro nao cabe em 4 bits:
+        -- expn = 15 + 1 da a volta para 0 e o HEX5 acende o C
+        do_test("T10 : 32640 + 32640         ESTOURO do expoente, HEX5 mostra C",
+                '0', 15, 16#FF#,
+                '0', 15, 16#FF#,
+                true);
 
         ------------------------------------------------------------------
         press_reset;
@@ -456,7 +509,7 @@ begin
 
         write(L, string'("====================================================================="));
         writeline(output, L);
-        write(L, string'(" T10 : KEY1 reinicia os dois operandos em +1,0"));
+        write(L, string'(" T11 : KEY1 reinicia os dois operandos em +1,0"));
         writeline(output, L);
         write(L, string'("---------------------------------------------------------------------"));
         writeline(output, L);
