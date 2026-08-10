@@ -1,6 +1,6 @@
 # Tutorial: Implementação de Somador de Ponto Flutuante na DE10-Lite
 
-**Autores:** André Luis Penha da Silva, Igor Domingos da Silva Mozetic, Kayky de Brito dos Santos
+**Autores:** André Luis Penha da Silva, Igor Domingos da Silva Mozetic, Kayky de Brito dos Santos 
 
 **Disciplina:** MCTA024 - Sistemas Digitais - Q2.2026
 
@@ -10,23 +10,23 @@
 
 ## Sumário
 
-| Seção                                                 | Conteúdo                                           | Etapa da disciplina |
-| ----------------------------------------------------- | -------------------------------------------------- | ------------------- |
-| [1](#1-objetivo-do-projeto)                           | Objetivo do projeto                                | -                   |
-| [2](#2-descrição-gráfica-do-funcionamento-do-sistema) | Descrição gráfica do funcionamento                 | Etapa 1             |
-| [3](#3-adaptações-de-hardware-de10-lite)              | Adaptações de hardware                             | Etapa 2             |
-| [4](#4-evidências-de-validação)                       | Evidências de validação (simulação, código, placa) | Etapas 2 e 3        |
-| [5](#5-diário-de-bordo-de-ia)                         | Diário de bordo de IA                              | Etapa 4             |
-| [6](#6-contribuição-dos-participantes)                | Contribuição dos participantes (CRediT)            | Etapa 4             |
+| Seção | Conteúdo | Etapa da disciplina |
+|---|---|---|
+| [1](#1-objetivo-do-projeto) | Objetivo do projeto | - |
+| [2](#2-descrição-gráfica-do-funcionamento-do-sistema) | Descrição gráfica do funcionamento | Etapa 1 |
+| [3](#3-adaptações-de-hardware-de10-lite) | Adaptações de hardware | Etapa 2 |
+| [4](#4-evidências-de-validação) | Evidências de validação (simulação, código, placa) | Etapas 2 e 3 |
+| [5](#5-diário-de-bordo-de-ia) | Diário de bordo de IA | Etapa 4 |
+| [6](#6-contribuição-dos-participantes) | Contribuição dos participantes (CRediT) | Etapa 4 |
 
 ---
 
-_Etapa 1_
+*Etapa 1*
 
 ## 1. Objetivo do Projeto
 
 Este projeto adapta o somador de ponto flutuante simplificado de 13 bits da Listing 3.19 de
-_FPGA Prototyping by VHDL Examples_ (Pong P. Chu, §3.7.4) – escrito para a placa Digilent S3
+*FPGA Prototyping by VHDL Examples* (Pong P. Chu, §3.7.4) – escrito para a placa Digilent S3
 com Spartan-3 – para a placa **Terasic DE10-Lite** (Intel MAX 10, `10M50DAF484C7G`).
 
 O objetivo é validar o algoritmo original por simulação, adequá-lo aos recursos físicos da
@@ -41,11 +41,11 @@ $$
 v = (-1)^{s} \times \frac{f}{256} \times 2^{e}
 $$
 
-| Campo         | Largura | Domínio                                                      |
-| ------------- | ------- | ------------------------------------------------------------ |
-| $s$: sinal    | 1 bit   | $s \in \{0, 1\}$, com $s = 1$ indicando número negativo      |
-| $e$: expoente | 4 bits  | $e \in [0, 15]$, inteiro **sem sinal**, sem excesso (_bias_) |
-| $f$: fração   | 8 bits  | $f \in [128, 255]$ – normalizada, bit 7 sempre `'1'`         |
+| Campo | Largura | Domínio |
+|---|---|---|
+| $s$: sinal | 1 bit | $s \in \{0, 1\}$, com $s = 1$ indicando número negativo |
+| $e$: expoente | 4 bits | $e \in [0, 15]$, inteiro **sem sinal**, sem excesso (*bias*) |
+| $f$: fração | 8 bits | $f \in [128, 255]$ – normalizada, bit 7 sempre `'1'` |
 
 Equivalentemente, na notação do livro, $v = (-1)^{s} \times 0.f \times 2^{e}$, já que
 $f / 256$ é exatamente a fração binária $0.f$ com 8 casas.
@@ -276,33 +276,33 @@ A seguir detalhamos as mudanças que efetuamos para a entrada de dados.
 
 ### 3.2 Mudanças efetuadas
 
-|                                | Original do Livro-texto                                                                                   | Nossa adaptação (DE10-Lite)                                                                 |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| **Displays**                   | 4 dígitos **multiplexados no tempo**, com `an(3:0)` de seleção e um único barramento `sseg` compartilhado | 6 dígitos **estáticos e independentes** (`HEX0`..`HEX5`), cada um com seus 8 pinos próprios |
-| **Módulo `disp_mux`**          | obrigatório, junto com um divisor de clock para varrer os dígitos                                         | **removido** já que a DE10-Lite não multiplexa displays                                     |
-| **Uso do clock**               | varredura dos displays                                                                                    | **apenas** para registrar os operandos                                                      |
-| **Entrada do operando 1**      | constante fixa (`exp1="1000"`, `frac1` com 2 bits de chave)                                               | **totalmente ajustável**                                                                    |
-| **Entrada do operando 2**      | `sign2`=1 chave, `exp2`=4 botões, `frac2`=7 chaves                                                        | **totalmente ajustável**                                                                    |
-| **Botões**                     | `btn(3:0)` alimentando o expoente diretamente                                                             | `KEY0` = carregar campo, `KEY1` = reiniciar                                                 |
-| **Sinal negativo**             | `led3` com padrão de barra central, num dígito multiplexado                                               | `HEX3` dedicado                                                                             |
-| **Estouro de expoente**        | não sinalizado                                                                                            | **`C` no HEX5** + `LEDR(8)`                                                                 |
-| **Visualização dos operandos** | inexistente                                                                                               | `SW(7)` alterna operando/resultado                                                          |
-| **Nível lógico dos displays**  | ativo-baixo                                                                                               | ativo-baixo (`hex_to_sseg` foi reaproveitado sem mudança)                                   |
+| | Original do Livro-texto | Nossa adaptação (DE10-Lite) |
+|---|---|---|
+| **Displays** | 4 dígitos **multiplexados no tempo**, com `an(3:0)` de seleção e um único barramento `sseg` compartilhado | 6 dígitos **estáticos e independentes** (`HEX0`..`HEX5`), cada um com seus 8 pinos próprios |
+| **Módulo `disp_mux`** | obrigatório, junto com um divisor de clock para varrer os dígitos | **removido** já que a DE10-Lite não multiplexa displays |
+| **Uso do clock** | varredura dos displays | **apenas** para registrar os operandos |
+| **Entrada do operando 1** | constante fixa (`exp1="1000"`, `frac1` com 2 bits de chave) | **totalmente ajustável** |
+| **Entrada do operando 2** | `sign2`=1 chave, `exp2`=4 botões, `frac2`=7 chaves | **totalmente ajustável** |
+| **Botões** | `btn(3:0)` alimentando o expoente diretamente | `KEY0` = carregar campo, `KEY1` = reiniciar |
+| **Sinal negativo** | `led3` com padrão de barra central, num dígito multiplexado | `HEX3` dedicado |
+| **Estouro de expoente** | não sinalizado | **`C` no HEX5** + `LEDR(8)` |
+| **Visualização dos operandos** | inexistente | `SW(7)` alterna operando/resultado |
+| **Nível lógico dos displays** | ativo-baixo | ativo-baixo (`hex_to_sseg` foi reaproveitado sem mudança) |
 
 **O que mudamos, item a item:**
 
-- **Removemos** o módulo `disp_mux` e o divisor de clock associado. Na DE10-Lite cada um dos
+* **Removemos** o módulo `disp_mux` e o divisor de clock associado. Na DE10-Lite cada um dos
   seis displays tem pinos dedicados, então a multiplexação temporal não é necessária na nossa placa.
-- **Removemos** as constantes amarradas ao operando 1. Nenhum campo do formato permanece fixo.
-- **Roteamos** as saídas para `HEX0`..`HEX5`, `LEDR(9:0)`, `KEY(1:0)` e `SW(9:0)` conforme o
+* **Removemos** as constantes amarradas ao operando 1. Nenhum campo do formato permanece fixo.
+* **Roteamos** as saídas para `HEX0`..`HEX5`, `LEDR(9:0)`, `KEY(1:0)` e `SW(9:0)` conforme o
   manual da DE10-Lite, importando as atribuições de pino do arquivo oficial `DE10_LITE.qsf` fornecido em Lab.
-- **Reorganizamos** a entrada num **protocolo de multiplexação por campo**: `SW(9:8)` escolhe
+* **Reorganizamos** a entrada num **protocolo de multiplexação por campo**: `SW(9:8)` escolhe
   qual dos quatro campos receberá `SW(6:0)` quando `KEY0` for pressionado. Quatro cargas
   sucessivas descrevem os 26 bits usando 7 chaves de dado.
-- **Reorganizamos** os displays num layout de leitura única (sinal · expoente · fração), em vez
+* **Reorganizamos** os displays num layout de leitura única (sinal · expoente · fração), em vez
   de espalhar operandos e resultado por dígitos separados.
-- **Acrescentamos** o indicador `C` de estouro do expoente, deduzido **fora** do somador.
-- **Acrescentamos** o seletor de display `SW(7)`, que permite conferir cada operando antes de
+* **Acrescentamos** o indicador `C` de estouro do expoente, deduzido **fora** do somador.
+* **Acrescentamos** o seletor de display `SW(7)`, que permite conferir cada operando antes de
   ler o resultado.
 
 ### 3.3 O somador em si não foi alterado
@@ -332,17 +332,17 @@ flowchart LR
     K1(["KEY1"]) --> RST["ambos os operandos = +1,0"]
 ```
 
-| `SW(9:8)` | Campo carregado por `KEY0`         | Bits de dado usados                   |
-| --------- | ---------------------------------- | ------------------------------------- |
-| `00`      | sinal e expoente do **operando 1** | `SW(4)` = sinal, `SW(3:0)` = expoente |
-| `01`      | fração do **operando 1**           | `frac = '1' & SW(6:0)`                |
-| `10`      | sinal e expoente do **operando 2** | `SW(4)` = sinal, `SW(3:0)` = expoente |
-| `11`      | fração do **operando 2**           | `frac = '1' & SW(6:0)`                |
+| `SW(9:8)` | Campo carregado por `KEY0` | Bits de dado usados |
+|---|---|---|
+| `00` | sinal e expoente do **operando 1** | `SW(4)` = sinal, `SW(3:0)` = expoente |
+| `01` | fração do **operando 1** | `frac = '1' & SW(6:0)` |
+| `10` | sinal e expoente do **operando 2** | `SW(4)` = sinal, `SW(3:0)` = expoente |
+| `11` | fração do **operando 2** | `frac = '1' & SW(6:0)` |
 
-| Botão  | Função                                 | Observação  |
-| ------ | -------------------------------------- | ----------- |
+| Botão | Função | Observação |
+|---|---|---|
 | `KEY0` | carrega o campo apontado por `SW(9:8)` | ativo-baixo |
-| `KEY1` | reinicia ambos os operandos em `+1,0`  | -           |
+| `KEY1` | reinicia ambos os operandos em `+1,0` | - |
 
 ### 3.5 Normalização da entrada
 
@@ -370,14 +370,14 @@ entrada desnormalizada, o somador elege o operando errado como "maior", resultan
 O `C` do `HEX5` é a letra inicial de **carry**: o vai-um do expoente, isto é, o bit que
 sobrou quando `expb + 1` não coube nos 4 bits do campo.
 
-| Display | Conteúdo                                                      | Fonte                  |
-| ------- | ------------------------------------------------------------- | ---------------------- |
-| `HEX5`  | `C` de **carry**: o expoente estourou; apagado caso contrário | constante `SSEG_C`     |
-| `HEX4`  | sempre apagado                                                | -                      |
-| `HEX3`  | `-` quando o valor exibido é negativo                         | constante `SSEG_MENOS` |
-| `HEX2`  | expoente (0–F), com ponto decimal **sempre aceso**            | `hex_to_sseg`          |
-| `HEX1`  | fração, nibble alto                                           | `hex_to_sseg`          |
-| `HEX0`  | fração, nibble baixo                                          | `hex_to_sseg`          |
+| Display | Conteúdo | Fonte |
+|---|---|---|
+| `HEX5` | `C` de **carry**: o expoente estourou; apagado caso contrário | constante `SSEG_C` |
+| `HEX4` | sempre apagado | - |
+| `HEX3` | `-` quando o valor exibido é negativo | constante `SSEG_MENOS` |
+| `HEX2` | expoente (0–F), com ponto decimal **sempre aceso** | `hex_to_sseg` |
+| `HEX1` | fração, nibble alto | `hex_to_sseg` |
+| `HEX0` | fração, nibble baixo | `hex_to_sseg` |
 
 Exemplos de leitura:
 
@@ -386,11 +386,11 @@ Exemplos de leitura:
    _ _ _  5.  8  0     →    (0x80 / 256) × 2^5   =      16
 ```
 
-| LED         | Significado                                                 |
-| ----------- | ----------------------------------------------------------- |
-| `LEDR(9)`   | sinal do resultado                                          |
-| `LEDR(8)`   | carry do expoente (visível mesmo exibindo um operando)      |
-| `LEDR(7)`   | display atual (aceso = resultado)                           |
+| LED | Significado |
+|---|---|
+| `LEDR(9)` | sinal do resultado |
+| `LEDR(8)` | carry do expoente (visível mesmo exibindo um operando) |
+| `LEDR(7)` | display atual (aceso = resultado) |
 | `LEDR(6:0)` | eco de `SW(6:0)` para conferencia do dado antes de carregar |
 
 ### 3.7 Detecção de estouro sem alterar o somador
@@ -418,16 +418,16 @@ Quando `ovf` está ativo, o `C` aparece no `HEX5` e o expoente real é 16.
 
 ### 3.8 Pinagem
 
-A pinagem é importada do arquivo oficial da Terasic via _Assignments → Import Assignments → `fp_adder/DE10_LITE.qsf`_.
+A pinagem é importada do arquivo oficial da Terasic via *Assignments → Import Assignments → `fp_adder/DE10_LITE.qsf`*.
 
-| Sinal                | Pinos (extrato)                                                          |
-| -------------------- | ------------------------------------------------------------------------ |
-| `MAX10_CLK1_50`      | `PIN_P11`                                                                |
-| `KEY[0]`, `KEY[1]`   | `PIN_B8`, `PIN_A7`                                                       |
-| `SW[0]`..`SW[9]`     | `PIN_C10`, `C11`, `D12`, `C12`, `A12`, `B12`, `A13`, `A14`, `B14`, `F15` |
-| `LEDR[0]`..`LEDR[9]` | `PIN_A8`, `A9`, `A10`, `B10`, `D13`, `C13`, `E14`, `D14`, `A11`, `B11`   |
-| `HEX0[0..7]`         | `PIN_C14`, `E15`, `C15`, `C16`, `E16`, `D17`, `C17`, `D15`               |
-| `HEX1`..`HEX5`       | idem, conforme `DE10_LITE.qsf`                                           |
+| Sinal | Pinos (extrato) |
+|---|---|
+| `MAX10_CLK1_50` | `PIN_P11` |
+| `KEY[0]`, `KEY[1]` | `PIN_B8`, `PIN_A7` |
+| `SW[0]`..`SW[9]` | `PIN_C10`, `C11`, `D12`, `C12`, `A12`, `B12`, `A13`, `A14`, `B14`, `F15` |
+| `LEDR[0]`..`LEDR[9]` | `PIN_A8`, `A9`, `A10`, `B10`, `D13`, `C13`, `E14`, `D14`, `A11`, `B11` |
+| `HEX0[0..7]` | `PIN_C14`, `E15`, `C15`, `C16`, `E16`, `D17`, `C17`, `D15` |
+| `HEX1`..`HEX5` | idem, conforme `DE10_LITE.qsf` |
 
 Configuração do projeto: família **MAX 10**, dispositivo **`10M50DAF484C7G`**, entidade topo
 **`fp_adder_demo`**, Quartus Prime **25.1std Lite**.
@@ -978,16 +978,16 @@ A interpretação do resultado corresponde a $(224/256) \times 2^{2} = 3{,}5$, c
 
 ---
 
-_Etapa 4_
+*Etapa 4*
 
 ## 5. Diário de Bordo de IA
 
 Usamos duas ferramentas, em fases distintas do trabalho:
 
-| Ferramenta  | Onde atuou                                                                                                                                                    |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Ferramenta | Onde atuou |
+|---|---|
 | **ChatGPT** | transcrição e formatação do VHDL do PDF; criação do projeto no Quartus e pinagem; primeira versão do wrapper `fp_adder_demo`; depuração dos displays na placa |
-| **Claude**  | testbench e `sim_demo.do`; protocolo de entrada por campo; indicador `C` de estouro; análise de casos de borda; ferramentas de depuração em HTML              |
+| **Claude** | testbench e `sim_demo.do`; protocolo de entrada por campo; indicador `C` de estouro; análise de casos de borda; ferramentas de depuração em HTML |
 
 Foram três conversas ao todo — duas com ChatGPT e uma longa com Claude. Esta seção reproduz
 os prompts que mais importantes para o projeto, os erros cometidos pelas ferramentas e as
@@ -995,9 +995,9 @@ correções que aplicamos.
 
 Artefatos de depuração gerados com IA e mantidos em [`debug/`](debug/):
 
-| Arquivo                                                      | Função                                                                               |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
-| [`debug/fp_adder_debug.html`](debug/fp_adder_debug.html)     | calculadora bit a bit do formato + conversor decimal → sequência de chaves           |
+| Arquivo | Função |
+|---|---|
+| [`debug/fp_adder_debug.html`](debug/fp_adder_debug.html) | calculadora bit a bit do formato + conversor decimal → sequência de chaves |
 | [`debug/de10_wave_player.html`](debug/de10_wave_player.html) | reprodutor de VCD exportado do Questa, desenhando a placa animada com linha do tempo |
 
 Ambos são **ferramentas de apoio** que podem ser abertas no navegador, desenvolvidas dada a escassa quantidade de aulas em lab.
@@ -1027,45 +1027,45 @@ pela linha do tempo e leitura dos displays acompanhando a simulação.
 Abaixo, transcritos literalmente, os prompts mais importantes para o projeto. Cada um está
 seguido do que produziu.
 
-> **[ChatGPT #1]** "Formate corretamente estes arquivos VHDL" _(seguido do texto colado
-> diretamente do PDF do livro)_
+> **[ChatGPT #1]** "Formate corretamente estes arquivos VHDL" *(seguido do texto colado
+> diretamente do PDF do livro)*
 
-_→ Devolveu o `fp_adder.vhd` indentado e com comentários de seção, sem alterar uma linha de
-lógica. É o arquivo que está no repositório até hoje._
+*→ Devolveu o `fp_adder.vhd` indentado e com comentários de seção, sem alterar uma linha de
+lógica. É o arquivo que está no repositório até hoje.*
 
 > **[ChatGPT #2]** "Como criar o projeto no Quartus para a DE10-Lite e mapear os pinos dos
 > displays, switches e botões?"
 
-_→ Roteiro de criação do projeto MAX 10 e a orientação de **importar** o `DE10_LITE.qsf` em
+*→ Roteiro de criação do projeto MAX 10 e a orientação de **importar** o `DE10_LITE.qsf` em
 vez de digitar pinos à mão (§3.8). Na mesma conversa veio o `hex_to_sseg` com codificação
-errada — §5.2, item 2._
+errada — §5.2, item 2.*
 
 > **[Claude]** "Temos estes: 1) VHDL para um Floating Point Adder; 2) VHDL para uma
 > demonstração deste FP que funciona na Placa DE10-LITE; 3) VHDL para um HEX to Seven-Segment
 > display da DE10-LITE; 4) Assignments da Placa DE10-Lite. Primeiro ponto que tenho dúvida:
 > consigo simular de maneira visual a placa no Questa?"
 
-_→ Resposta negativa — o Questa é simulador de lógica — seguida de três alternativas: radix
+*→ Resposta negativa — o Questa é simulador de lógica — seguida de três alternativas: radix
 customizado, uma GUI externa e um testbench que imprime a "foto" dos displays. Adotamos a
-primeira e a terceira, que são hoje o `sim_demo.do` (§4.1) e o `show_board` do testbench._
+primeira e a terceira, que são hoje o `sim_demo.do` (§4.1) e o `show_board` do testbench.*
 
 > **[Claude]** "Agora eu gostaria de pensar em como podemos transformar todos expoentes,
 > sinais e fracs em inputs."
 
-_→ Quatro alternativas com custos explícitos: seletor nas chaves, contador nos botões,
+*→ Quatro alternativas com custos explícitos: seletor nas chaves, contador nos botões,
 expoente reduzido a 3 bits e entrada via JTAG. Escolhemos a primeira — o protocolo por campo
-da §3.4._
+da §3.4.*
 
 > **[Claude]** "Inicialmente só estou pensando em como representar o Carry na saída. […]
 > Só de ideias, não execute ainda."
 
-_→ Levantamento de opções (porta de saída, saturar, código reservado no expoente, padrão no
-display, LEDs de exceção), sem código. Foi o que abriu caminho para a pergunta seguinte._
+*→ Levantamento de opções (porta de saída, saturar, código reservado no expoente, padrão no
+display, LEDs de exceção), sem código. Foi o que abriu caminho para a pergunta seguinte.*
 
 > **[Claude]** "Mas eu não consigo mostrar o valor do carry em si?"
 
-_→ A constatação de que o expoente verdadeiro, quando estoura, é **sempre exatamente 16** —
-nunca 17. Daí nasceu o indicador `C` do `HEX5` e a regra de leitura da §3.7._
+*→ A constatação de que o expoente verdadeiro, quando estoura, é **sempre exatamente 16** —
+nunca 17. Daí nasceu o indicador `C` do `HEX5` e a regra de leitura da §3.7.*
 
 > **[Claude]** "Remova possibilidade de colocar números não normalizados (sempre vamos forçar
 > o primeiro bit 1). SW7 vai virar uma chave para alterar entre RESULTADO ou OPERANDO atual
@@ -1073,37 +1073,37 @@ nunca 17. Daí nasceu o indicador `C` do `HEX5` e a regra de leitura da §3.7._
 > exp. HEX3 um sinal de negativo se o número for negativo. HEX5 vai mostrar 'C' se houver
 > carry. DP do HEX2 sempre aceso para demonstrar a separação entre o EXP(HEX2) e FRAC(1 e 0)"
 
-_→ Especificação nossa, após pesquisa sobre a IEEE 754, executada pela ferramenta: produziu a versão final do
-`fp_adder_demo.vhd` e o testbench correspondente — o layout de displays descrito na §3.6._
+*→ Especificação nossa, após pesquisa sobre a IEEE 754, executada pela ferramenta: produziu a versão final do
+`fp_adder_demo.vhd` e o testbench correspondente — o layout de displays descrito na §3.6.*
 
-> **[Claude]** _(anexando a Table 1 do livro)_ "Me dê os `do_test`s para executar a simulação
+> **[Claude]** *(anexando a Table 1 do livro)* "Me dê os `do_test`s para executar a simulação
 > com estes casos de borda."
 
-_→ Casos que exercitavam os mesmos ramos do circuito, mas com **outros números**, descartando
-os valores do livro. Rejeitado — §5.2, item 7._
+*→ Casos que exercitavam os mesmos ramos do circuito, mas com **outros números**, descartando
+os valores do livro. Rejeitado — §5.2, item 7.*
 
 > **[Claude]** "Você deveria ter mantido o expoente e representado a fração mais próxima."
 
-_→ A tradução correta da Table 1: `0.54 → 0x8A`, `0.87 → 0xDF`, `0.55 → 0x8D`, `0.56 → 0x8F`,
-`0.52 → 0x85`. São os casos `EG1` a `EG4` do testbench (§4.3)._
+*→ A tradução correta da Table 1: `0.54 → 0x8A`, `0.87 → 0xDF`, `0.55 → 0x8D`, `0.56 → 0x8F`,
+`0.52 → 0x85`. São os casos `EG1` a `EG4` do testbench (§4.3).*
 
-> **[Claude]** _(anexando print do waveform do Questa)_ "Estas são as etapas do somador no
+> **[Claude]** *(anexando print do waveform do Questa)* "Estas são as etapas do somador no
 > simulador Questa. O que ocorreu no estágio de normalização para desviar do valor sugerido
 > pelo paper?"
 
-_→ O diagnóstico do caso III: `sum_norm` calcula a fração certa, mas `leado > expb` descarta o
-resultado por falta de expoente. É a explicação usada na §4.4._
+*→ O diagnóstico do caso III: `sum_norm` calcula a fração certa, mas `leado > expb` descarta o
+resultado por falta de expoente. É a explicação usada na §4.4.*
 
 > **[Claude]** "Eu estou pensando se a `leado` que está 6 não deveria ser 2?"
 
-_→ Demonstração de que 6 está correto: `9'h003` engana porque dois zeros hexadecimais já valem
-cinco bits. Verificamos por conta própria deslocando `0x03` — §5.3._
+*→ Demonstração de que 6 está correto: `9'h003` engana porque dois zeros hexadecimais já valem
+cinco bits. Verificamos por conta própria deslocando `0x03` — §5.3.*
 
 > **[Claude]** "Desfaça qualquer melhoria no somador que você fez que causou divergências no
 > EG3."
 
-_→ Comparação de hash mostrando que o `fp_adder.vhd` nunca havia sido alterado: o underflow
-gradual tinha sido apenas proposta em texto. Confirmou a decisão de manter o somador intocado._
+*→ Comparação de hash mostrando que o `fp_adder.vhd` nunca havia sido alterado: o underflow
+gradual tinha sido apenas proposta em texto. Confirmou a decisão de manter o somador intocado.*
 
 ### 5.2 Os erros da IA (alucinações e enganos)
 
@@ -1121,13 +1121,13 @@ vhdl/
 Nomes de arquivo, esquema de numeração e hierarquia de pastas, mas **nada disso existe** com essa
 forma.
 
-_Correção:_ extraímos os módulos diretamente do texto do PDF.
+*Correção:* extraímos os módulos diretamente do texto do PDF.
 
 **(2) ChatGPT gerou um `hex_to_sseg` com a codificação de segmentos errada.**
 A primeira versão usava ordem de bits/polaridade incompatível com a DE10-Lite. Os displays
-acendiam padrões sem sentido.
+acendiam padrões sem sentido. 
 
-_Correção:_ Enviamos o arquivo do Lab 3 como referência. A IA "corrigiu" o arquivo só depois de recebermos o comportamento errado no hardware.
+*Correção:* Enviamos o arquivo do Lab 3 como referência. A IA "corrigiu" o arquivo só depois de recebermos o comportamento errado no hardware.
 
 **(3) ChatGPT propôs um mapeamento de chaves que inutilizava o somador.**
 A sugestão foi `frac <= "111" & SW(4 downto 0)`, prendendo três bits em `'1'`.
@@ -1136,21 +1136,21 @@ Isso restringe a fração a `0xE0`–`0xFF` → valores entre 0,875 e 0,996. Con
 a IA não previu: **nenhuma potência de dois é representável.** Não dá para digitar 1,0, nem
 2,0, nem 0,5 por exemplo.
 
-_Correção:_ travamos apenas o bit 7 (`'1' & SW(6 downto 0)`), o único cuja fixação tem
+*Correção:* travamos apenas o bit 7 (`'1' & SW(6 downto 0)`), o único cuja fixação tem
 justificativa técnica (normalização), e liberamos os outros sete.
 
 **(4) ChatGPT usou `KEY1` como "carregar operando 2".**
 Funcional, mas gasta um botão numa função que o seletor de campo já cobre, e deixa o projeto
 sem reset.
 
-_Correção:_ `KEY0` carrega o campo apontado por `SW(9:8)`, e `KEY1` virou
+*Correção:* `KEY0` carrega o campo apontado por `SW(9:8)`, e `KEY1` virou
 reset.
 
 **(5) ChatGPT propôs espalhar operandos e resultado por seis displays.**
 `HEX5:HEX4` = operando 1, `HEX3:HEX2` = operando 2, `HEX1:HEX0` = resultado. Com dois dígitos
 por número, não há espaço para sinal nem para separar expoente de fração, deixando a leitura ambígua.
 
-_Correção:_ adotamos um número por vez, com `SW(7)` alternando o display, e usamos os
+*Correção:* adotamos um número por vez, com `SW(7)` alternando o display, e usamos os
 dígitos livres para sinal, estouro e separador.
 
 **(6) Claude sugeriu "corrigir" o zero negativo.**
@@ -1159,42 +1159,42 @@ Ao listar casos de borda, propôs forçar `sign_out <= '0'` quando o resultado �
 o zero negativo como defeito. A Table 1 do livro mostra explicitamente `−0.00E0` no eg. 3,
 com o sinal preservado.
 
-_Correção:_ mantivemos `sign_out <= signb` como está.
+*Correção:* mantivemos `sign_out <= signb` como está.
 
 **(7) Claude buscou análogos "estruturais" para os casos da Table 1, em vez de traduzir os
-números.**
+números.** 
 
 Pedimos os casos de teste correspondentes à tabela do livro. A IA procurou por pares que exercitassem os mesmos ramos do circuito, descartando os
 valores originais.
 
-_Correção humana:_ "Você deveria ter mantido o expoente e representado a
+*Correção humana:* "Você deveria ter mantido o expoente e representado a
 fração mais próxima." Traduzir `0.54 → 0x8A`, `0.87 → 0xDF` etc.
 
 ### 5.3 As correções humanas
 
-| #   | Erro da IA                            | Correção humana                        | Impacto                                 |
-| --- | ------------------------------------- | -------------------------------------- | --------------------------------------- |
-| 1   | Caminhos inventados no ZIP do livro   | extração dos módulos do próprio PDF    | desbloqueou a compilação                |
-| 2   | Codificação de segmentos incompatível | reutilização do arquivo do Lab 3       | displays passaram a exibir dígitos      |
-| 3   | `"111" & SW(4:0)`: 3 bits travados    | `'1' & SW(6:0)`: só o bit 7            | tornou potências de dois representáveis |
-| 4   | `KEY1` como segunda carga             | `KEY1` como reinício/autoteste         | diagnóstico rápido na placa             |
-| 5   | Seis displays fragmentados            | um número por vez + `SW(7)` de display | leitura sem ambiguidade                 |
-| 6   | "Corrigir" o zero negativo            | manter `sign_out <= signb`             | fidelidade ao livro                     |
-| 7   | Análogos estruturais da Table 1       | traduzir mantendo o expoente           | rastreabilidade com o livro             |
+| # | Erro da IA | Correção humana | Impacto |
+|---|---|---|---|
+| 1 | Caminhos inventados no ZIP do livro | extração dos módulos do próprio PDF | desbloqueou a compilação |
+| 2 | Codificação de segmentos incompatível | reutilização do arquivo do Lab 3 | displays passaram a exibir dígitos |
+| 3 | `"111" & SW(4:0)`: 3 bits travados | `'1' & SW(6:0)`: só o bit 7 | tornou potências de dois representáveis |
+| 4 | `KEY1` como segunda carga | `KEY1` como reinício/autoteste | diagnóstico rápido na placa |
+| 5 | Seis displays fragmentados | um número por vez + `SW(7)` de display | leitura sem ambiguidade |
+| 6 | "Corrigir" o zero negativo | manter `sign_out <= signb` | fidelidade ao livro |
+| 7 | Análogos estruturais da Table 1 | traduzir mantendo o expoente | rastreabilidade com o livro |
 
 Além disso, decisões estruturais foram **nossas, não da IA**, com a IA atuando como
 levantadora de alternativas:
 
-- **Escolha do protocolo de entrada.** A IA apresentou quatro opções (seletor nas chaves;
+* **Escolha do protocolo de entrada.** A IA apresentou quatro opções (seletor nas chaves;
   contador nos botões; expoente reduzido a 3 bits; entrada via JTAG) com custos e perdas. A
   escolha pela opção do seletor foi nossa, dada a maior intuitividade no uso da placa.
-- **Exibir o carry como valor** Partiu da nossa pergunta "mas eu não consigo
-  mostrar o _valor_ do carry em si?". A resposta – que o expoente verdadeiro é sempre
+* **Exibir o carry como valor** Partiu da nossa pergunta "mas eu não consigo
+  mostrar o *valor* do carry em si?". A resposta – que o expoente verdadeiro é sempre
   exatamente 16, e por isso o `HEX2` sempre mostra `0` com o `C` aceso – veio da IA, mas a
   pergunta que a produziu foi humana.
-- **Manter `fp_adder.vhd` intocado.** A IA chegou a _propor_ um underflow gradual (`sh := minimum(leado, expb)`)
+* **Manter `fp_adder.vhd` intocado.**  A IA chegou a *propor* um underflow gradual (`sh := minimum(leado, expb)`)
   como melhoria, que recusamos, porque afasta o comportamento do que o livro descreve.
-- **Dúvida sobre `leado = 6`.** Ao ler o waveform, suspeitamos que o valor deveria ser 2, por
+* **Dúvida sobre `leado = 6`.** Ao ler o waveform, suspeitamos que o valor deveria ser 2, por
   causa dos dois zeros hexadecimais em `9'h003`, mas na verdade deveriamos olhar a representação binária.
   Aqui a IA nos corrigiu, e a verificação independente foi nossa.
 
@@ -1204,34 +1204,34 @@ Nem tudo o que a IA propôs foi rejeitado: a maior parte do que está no `fp_add
 nasceu de uma sugestão que analisamos e adotamos. Registramos aqui **o critério** usado em
 cada caso.
 
-| Sugestão adotada                                                          | Por que aceitamos                                                                                                                                                                                                                 | O que aprendemos com isso                                                                                                                                                                                |
-| ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Multiplexar a entrada por campo** (`SW(9:8)` seleciona, `KEY0` carrega) | Após reflexão sobre as alternativas, pareceu a de usabilidade mais intuitiva                                                                                                                                                      | Que uma escolha de interface pode **eliminar** um problema de hardware (debounce) também, já que facilitou o código ao mesmo tempo que forneceu uma experiência mais compreensível de inserção de dados. |
-| **Forçar o bit 7 da fração em `'1'`**                                     | Verificamos a premissa no `fp_adder.vhd`: o primeiro estágio compara `exp & frac` como inteiro de 12 bits, e essa comparação só vale com operandos normalizados.                                                                  | Entendemos por que o livro exige entrada normalizada e também aprendemos ligeiramente sobre a IEEE 754 e seu funcionamento.                                                                              |
-| **Exibir o estouro como `C`, deduzido fora do somador**                   | Conferimos o raciocínio: com sinais iguais `exp_out` só pode ser `expb` ou `expb+1`, e o ramo geral (`expb − leado`, com `leado ≤ 7`) nunca produz `0` a partir de `expb = 15`. A dedução é válida sem tocar na entidade do livro | Que daria para recuperar o carry observando o wrapper, não tendo de nos preocupar com a corretudo do fp_adder após modificações                                                                          |
+| Sugestão adotada | Por que aceitamos | O que aprendemos com isso |
+|---|---|---|
+| **Multiplexar a entrada por campo** (`SW(9:8)` seleciona, `KEY0` carrega) | Após reflexão sobre as alternativas, pareceu a de usabilidade mais intuitiva | Que uma escolha de interface pode **eliminar** um problema de hardware (debounce) também, já que facilitou o código ao mesmo tempo que forneceu uma experiência mais compreensível de inserção de dados. |
+| **Forçar o bit 7 da fração em `'1'`** | Verificamos a premissa no `fp_adder.vhd`: o primeiro estágio compara `exp & frac` como inteiro de 12 bits, e essa comparação só vale com operandos normalizados. | Entendemos por que o livro exige entrada normalizada e também aprendemos ligeiramente sobre a IEEE 754 e seu funcionamento. |
+| **Exibir o estouro como `C`, deduzido fora do somador** | Conferimos o raciocínio: com sinais iguais `exp_out` só pode ser `expb` ou `expb+1`, e o ramo geral (`expb − leado`, com `leado ≤ 7`) nunca produz `0` a partir de `expb = 15`. A dedução é válida sem tocar na entidade do livro | Que daria para recuperar o carry observando o wrapper, não tendo de nos preocupar com a corretudo do fp_adder após modificações |
 
 ### 5.5 Avaliação crítica do uso da ferramenta
 
 **Onde ajudou:**
 
-- **Volume mecânico.** Transcrever e formatar VHDL de um PDF, montar a tabela reversa de sete
+* **Volume mecânico.** Transcrever e formatar VHDL de um PDF, montar a tabela reversa de sete
   segmentos do testbench, escrever os `add wave` do script `sim_demo.do`, facilitando os testes.
-- **Levantamento de alternativas.** Diante do gargalo de 26 bits em 10 chaves, ter quatro
+* **Levantamento de alternativas.** Diante do gargalo de 26 bits em 10 chaves, ter quatro
   opções com custos explícitos acelerou muito a decisão.
-- **Explicação sob demanda.** Perguntas como "por que o resultado desviou do livro?" e "por
+* **Explicação sob demanda.** Perguntas como "por que o resultado desviou do livro?" e "por
   que a normalização precisa da entrada normalizada?" renderam explicações que mudaram nossa
-  compreensão do circuito – em particular, entender que o quarto estágio normaliza a _saída_ e
+  compreensão do circuito – em particular, entender que o quarto estágio normaliza a *saída* e
   confia na entrada.
-- **Ferramentas descartáveis.** As duas páginas HTML de depuração não caberiam no orçamento de
+* **Ferramentas descartáveis.** As duas páginas HTML de depuração não caberiam no orçamento de
   tempo do trabalho se fossem escritas à mão, e economizaram muitas rodadas de simulação, principalmente dada a baixa quantidade de oportunidades com a placa física para testes.
 
 **Onde exigiu vigilância:**
 
-- **Confiança uniforme.** A IA descreve com o mesmo tom tanto o que verificou quanto o
+* **Confiança uniforme.** A IA descreve com o mesmo tom tanto o que verificou quanto o
   que inventou. O caminho falso do ZIP (§5.2.1) veio na mesma voz das explicações corretas.
-- **Conhecimento de hardware específico.** Codificação de segmentos, polaridade de botões e
+* **Conhecimento de hardware específico.** Codificação de segmentos, polaridade de botões e
   pinagem da DE10-Lite foram justamente os pontos de mais erro.
-- **Consequências numéricas de decisões estruturais.** Nenhuma das duas ferramentas percebeu
+* **Consequências numéricas de decisões estruturais.** Nenhuma das duas ferramentas percebeu
   espontaneamente que travar três bits da fração eliminaria todas as potências de dois. O erro
   só apareceu quando tentamos digitar `1,0` e descobrimos que não dava.
 
@@ -1244,10 +1244,10 @@ cada caso.
 
 **Conclusão.** A IA foi um acelerador real de produtividade e um bom tradutor técnico,
 especialmente para explorar alternativas e explicar comportamento. Não foi confiável como
-fonte de fatos sobre hardware específico.
+fonte de fatos sobre hardware específico. 
 
 O padrão que funcionou foi: **usar a IA para gerar e explicar, e os assignments da placa, o livro e a simulação
-para decidir.**
+para decidir.** 
 
 ---
 
@@ -1257,18 +1257,19 @@ Segundo a taxonomia **CRediT** (<https://credit.niso.org/>). O trabalho foi cond
 bastante colaborativa, assim as atribuições abaixo indicam **onde cada um concentrou esforço**, e
 não exclusividade:
 
-- **Kayky de Brito dos Santos** – Administração do projeto; Software (wrapper
+* **Kayky de Brito dos Santos** – Administração do projeto; Software (wrapper
   `fp_adder_demo`, protocolo de entrada por campo, layout dos displays); Análise formal
   (dedução da detecção de estouro do expoente); Metodologia (definição dos casos de teste);.
-- **Igor Domingos da Silva Mozetic** – Software (testbench e script de simulação); Validação
+* **Igor Domingos da Silva Mozetic** – Software (testbench e script de simulação); Validação
   (execução das simulações no Questa e conferência do 4º estágio); Recursos (montagem do
   projeto no Quartus, pinagem e gravação da placa); Curadoria de dados.
-- **André Luis Penha da Silva** – Redação do rascunho original; Visualização (formas de onda,
+* **André Luis Penha da Silva** – Redação do rascunho original; Visualização (formas de onda,
   diagramas e fotografias da bancada); Conceituação; Curadoria de dados (registro e auditoria do uso de IA).
 
 As etapas de investigação, validação e revisão do texto foram feitas pelos três integrantes em conjunto.
 
 ---
+
 
 ## Apêndice – Estrutura do repositório
 
