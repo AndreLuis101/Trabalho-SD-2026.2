@@ -1284,7 +1284,7 @@ possibilidade de verificar e o alinhamento com o objetivo.**
    preciso e mesmo assim foi recusado. Ter esse critério explícito evitou uma sequência de
    "melhorias" que teriam descaracterizado o projeto do livro.
 
-**Conclusão.** A IA foi um acelerador real de produtividade e um bom interlocutor técnico,
+**Conclusão.** A IA foi um acelerador real de produtividade e um bom tradutor técnico,
 especialmente para explorar alternativas e explicar comportamento. Não foi confiável como
 fonte de fatos sobre hardware específico, nem como relatora do próprio trabalho. O padrão que
 funcionou foi: **usar a IA para gerar e explicar, e o manual da placa, o livro e a simulação
