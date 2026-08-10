@@ -107,8 +107,7 @@ flowchart TD
 
 ### 2.2 Estágios (`fp_adder.vhd`)
 
-O somador é **puramente combinacional**: não tem clock, nem reset, nem estado. Não existe
-máquina de estados a documentar dentro dele — o diagrama abaixo representa o fluxo de dados:
+Como o somador é puramente combinacional, ele opera sem sinais de clock ou reset. O diagrama abaixo detalha o fluxo de dados do circuito, sem a necessidade de uma máquina de estados:
 
 ```mermaid
 flowchart TD
@@ -135,31 +134,29 @@ flowchart TD
 
 ### 2.3 Quarto Estágio
 
-**(a) Contagem de zeros à esquerda — `leado`**, um codificador de prioridade que varre
-`sum(7)` para baixo:
+**(a) Contagem de zeros à esquerda (`leado`)**: codificador de prioridade que identifica o bit '1' mais significativo a partir de `sum(7)`:
 
-| Condição | `leado` | Significado |
-|---|---|---|
-| `sum(7) = '1'` | 0 | já normalizado |
-| `sum(6) = '1'` | 1 | 1 zero à esquerda |
-| `sum(5) = '1'` | 2 | 2 zeros |
-| `sum(4) = '1'` | 3 | 3 zeros |
-| `sum(3) = '1'` | 4 | 4 zeros |
-| `sum(2) = '1'` | 5 | 5 zeros |
-| `sum(1) = '1'` | 6 | 6 zeros |
-| caso contrário | 7 | `sum(0)` ou tudo zero |
+| Condição       | `leado` | Descrição                        |
+| -------------- | ------- | -------------------------------- |
+| `sum(7) = '1'` | 0       | Já normalizado                   |
+| `sum(6) = '1'` | 1       | 1 zero à esquerda                |
+| `sum(5) = '1'` | 2       | 2 zeros à esquerda               |
+| `sum(4) = '1'` | 3       | 3 zeros à esquerda               |
+| `sum(3) = '1'` | 4       | 4 zeros à esquerda               |
+| `sum(2) = '1'` | 5       | 5 zeros à esquerda               |
+| `sum(1) = '1'` | 6       | 6 zeros à esquerda               |
+| Outros casos   | 7       | Bit `sum(0)` ativo ou valor nulo |
 
-**(b) Deslocador barrel (`sum_norm`)**: desloca `sum(7 downto 0)` à esquerda por `leado`,
-preenchendo com zeros.
+**(b) Deslocamento de normalização (`sum_norm`)**: desloca `sum(7 downto 0)` à esquerda de acordo com o valor de `leado`, preenchendo os bits restantes com zero.
 
-**(c) Decisão final**, com os **quatro casos** cobertos pelos testes:
+**(c) Ajuste final**: cobre as quatro condições de borda validadas na simulação:
 
-| Caso | Condição | Ação | Exemplo do livro |
-|---|---|---|---|
-| **I — sem ajuste** | `sum(8)=0`, `leado=0` | `expn = expb`, `fracn = sum` | eg. 1: `−0.82E4` |
-| **II — desloca à esquerda** | `sum(8)=0`, `0 < leado ≤ expb` | `expn = expb − leado` | eg. 2: `−0.01E3 → −0.10E2` |
-| **III — vira zero** | `sum(8)=0`, `leado > expb` | `expn = 0`, `fracn = 0` | eg. 3: `−0.01E0 → −0.00E0` |
-| **IV — vai-um** | `sum(8)=1` | `expn = expb + 1`, desloca 1 à direita | eg. 4: `+1.07E3 → +0.10E4` |
+| Caso                             | Condição                       | Ação                                                                           | Referência do Livro            |
+| -------------------------------- | ------------------------------ | ------------------------------------------------------------------------------ | ------------------------------ |
+| **I — Sem ajuste**               | `sum(8)=0`, `leado=0`          | Mantém `expn = expb` e `fracn = sum`                                           | Ex. 1: `−0.82E4`<br>           |
+| **II — Normalização à esquerda** | `sum(8)=0`, `0 < leado ≤ expb` | Decrementa o expoente (`expn = expb − leado`)                                  | Ex. 2: `−0.01E3 → −0.10E2`<br> |
+| **III — Underflow (zerado)**     | `sum(8)=0`, `leado > expb`     | Força `expn = 0` e `fracn = 0`                                                 | Ex. 3: `−0.01E0 → −0.00E0`<br> |
+| **IV — Carry-out no MSB**        | `sum(8)=1`                     | Incrementa o expoente (`expn = expb + 1`) e desloca a mantissa 1 bit à direita | Ex. 4: `+1.07E3 → +0.10E4`<br> |
 
 ### 2.4 Tabela verdade do decodificador (`hex_to_sseg.vhd`)
 
@@ -168,25 +165,29 @@ e validado essa lógica em VHDL. A numeração dos segmentos é a mesma vista l�
 
 ![Decodificador e display de sete segmentos](img/seven-segment-decoder-lab3.png)
 
-*Fig. 12 do roteiro do Lab 3 — decodificador e "Seven Segment Display".*
+_Fig. 12 do roteiro do Lab 3 — decodificador e "Seven Segment Display"._
 
 Os índices da figura correspondem diretamente aos bits do vetor de saída: o segmento `0` é o
 traço superior (`a`), e a numeração segue no sentido horário até o `5` (`f`), com o `6` sendo
 o traço central (`g`).
 
-Displays da DE10-Lite são **ativos em nível baixo** (`'0'` acende o segmento). Ordem dos bits:
-`sseg(6..0) = g f e d c b a`, e `sseg(7) = not dp`.
+Os displays de 7 segmentos da DE10-Lite operam em **lógica invertida (ativo em nível baixo)**, ou seja, o bit `'0'` acende o segmento.
 
-| `hex` | Dígito | `sseg(6:0)` | | `hex` | Dígito | `sseg(6:0)` |
-|---|---|---|---|---|---|---|
-| 0000 | 0 | `1000000` | | 1000 | 8 | `0000000` |
-| 0001 | 1 | `1111001` | | 1001 | 9 | `0010000` |
-| 0010 | 2 | `0100100` | | 1010 | A | `0001000` |
-| 0011 | 3 | `0110000` | | 1011 | b | `0000011` |
-| 0100 | 4 | `0011001` | | 1100 | C | `0100111` |
-| 0101 | 5 | `0010010` | | 1101 | d | `0100001` |
-| 0110 | 6 | `0000010` | | 1110 | E | `0000110` |
-| 0111 | 7 | `1111000` | | 1111 | F | `0001110` |
+O mapeamento dos bits segue o padrão:
+
+- `sseg(6 downto 0)` = `g f e d c b a`
+- `sseg(7)` = `not dp` (ponto decimal)
+
+| `hex` | Dígito | `sseg(6:0)` |     | `hex` | Dígito | `sseg(6:0)` |
+| ----- | ------ | ----------- | --- | ----- | ------ | ----------- |
+| 0000  | 0      | `1000000`   |     | 1000  | 8      | `0000000`   |
+| 0001  | 1      | `1111001`   |     | 1001  | 9      | `0010000`   |
+| 0010  | 2      | `0100100`   |     | 1010  | A      | `0001000`   |
+| 0011  | 3      | `0110000`   |     | 1011  | b      | `0000011`   |
+| 0100  | 4      | `0011001`   |     | 1100  | C      | `0100111`   |
+| 0101  | 5      | `0010010`   |     | 1101  | d      | `0100001`   |
+| 0110  | 6      | `0000010`   |     | 1110  | E      | `0000110`   |
+| 0111  | 7      | `1111000`   |     | 1111  | F      | `0001110`   |
 
 Um padrão usado no projeto **não está nesta tabela**: `0111111`, que acende apenas o segmento
 `g` e desenha um traço. É o que o `HEX3` exibe quando o número mostrado é negativo.
@@ -219,9 +220,7 @@ aparece nos displays. Com `SW(7) = '1'`, os displays mostram o resultado.
 
 ### 2.6 Fluxo de operação na placa
 
-O único elemento sequencial do sistema são os seis registradores de operando. O
-comportamento é o de um banco de registradores com escrita seletiva — não há máquina de
-estados com transições condicionais, então o diagrama abaixo descreve o fluxo de uso:
+O circuito possui como único elemento sequencial o conjunto de seis registradores de entrada. O sistema atua como um banco de registradores com escrita seletiva, sem o uso de máquinas de estados. O fluxo de uso na placa segue a sequência descrita abaixo:
 
 ```mermaid
 stateDiagram-v2
@@ -246,13 +245,11 @@ stateDiagram-v2
     end note
 ```
 
-O caminho combinacional — soma, seleção do que exibir e decodificação para os sete segmentos —
-é contínuo: qualquer mudança nos registradores ou na chave de display aparece nos dígitos no
-mesmo instante, sem esperar borda de clock.
+O processamento combinacional, que abrange a soma, a seleção do sinal de exibição e a decodificação para os displays de sete segmentos, ocorre de forma contínua. Qualquer alteração nos registradores ou nas chaves de seleção atualiza os dígitos instantaneamente, sem a necessidade de uma borda de clock.
 
 ---
 
-*Etapa 2*
+_Etapa 2_
 
 ## 3. Adaptações de Hardware (DE10-Lite)
 
