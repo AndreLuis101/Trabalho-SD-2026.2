@@ -50,16 +50,6 @@ $$
 Equivalentemente, na notação do livro, $v = (-1)^{s} \times 0.f \times 2^{e}$, já que
 $f / 256$ é exatamente a fração binária $0.f$ com 8 casas.
 
-Diferenças relevantes em relação ao IEEE 754, que explicam várias decisões deste trabalho:
-
-| | Nosso Somador | IEEE 754 |
-|---|---|---|
-| Bit mais significativo da fração | **armazenado** (gasta 1 bit para guardar uma constante) | implícito |
-| Expoente | inteiro sem sinal, sem bias — só expoentes positivos | com excesso (bias) |
-| Faixa | $[0{,}5;\ 32640]$ em magnitude | muito maior |
-| Zero | não é representável de forma canônica (bit 7 forçado) | codificação reservada |
-| Arredondamento | inexistente — truncamento puro | 5 modos |
-
 Os extremos de magnitude não nula são, portanto:
 
 $$
@@ -67,6 +57,32 @@ v_{\min} = \frac{128}{256} \times 2^{0} = 0{,}5
 \qquad\qquad
 v_{\max} = \frac{255}{256} \times 2^{15} = 32640
 $$
+
+#### Exemplo de conversão: 70,5
+
+**Ida — de decimal para o formato.** Escreve-se o número em binário e desloca-se a vírgula
+até que só reste `0,` à esquerda, contando os deslocamentos:
+
+$$
+70{,}5_{10} = 1000110{,}1_{2} = \underbrace{0{,}10001101_{2}}_{f} \times 2^{\overbrace{7}^{e}}
+$$
+
+Foram **7** casas, então $e = 7 = 0111_2$. Os oito bits após a vírgula são a fração,
+$f = 10001101_2 = 0\text{x}8D = 141$. O número é positivo, logo $s = 0$. O bit mais à
+esquerda de $f$ sempre deve ser `'1'`, como exige a normalização, caso contrário o
+deslocamento teria parado cedo demais.
+
+Resultado: `0 0111 10001101`.
+
+**Volta — do formato para decimal.** Basta aplicar a fórmula aos três campos:
+
+$$
+v = (-1)^{0} \times \frac{141}{256} \times 2^{7} = 0{,}55078125 \times 128 = 70{,}5
+$$
+
+A conversão neste caso é **exata** nos dois sentidos. Isso não é verdade para todos os números: 
+`3,14159`, por exemplo, é representável apenas como `3,140625` 
+— a página `debug/fp_adder_debug.html` (§5) classifica cada entrada em exata, aproximada ou fora de faixa.
 
 ---
 
@@ -84,11 +100,10 @@ flowchart TD
     DEMO --> S0["hex_to_sseg.vhd<br/>HEX0 — frac[3:0]"]
 ```
 
-### 2.2 O algoritmo em quatro estágios (`fp_adder.vhd`)
+### 2.2 Estágios (`fp_adder.vhd`)
 
 O somador é **puramente combinacional**: não tem clock, nem reset, nem estado. Não existe
-máquina de estados a documentar dentro dele — o diagrama abaixo é de fluxo de dados, não de
-estados.
+máquina de estados a documentar dentro dele — o diagrama abaixo representa o fluxo de dados:
 
 ```mermaid
 flowchart TD
@@ -113,7 +128,7 @@ flowchart TD
     N3 --> OUT
 ```
 
-### 2.3 O quarto estágio em detalhe (ponto de observação da Etapa 1)
+### 2.3 Quarto Estágio
 
 **(a) Contagem de zeros à esquerda — `leado`**, um codificador de prioridade que varre
 `sum(7)` para baixo:
