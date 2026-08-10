@@ -256,11 +256,12 @@ mesmo instante, sem esperar borda de clock.
 
 ## 3. Adaptações de Hardware (DE10-Lite)
 
-### 3.1 O problema central: 26 bits de entrada, 10 chaves
+### 3.1 Entrada de Dados Original
 
-O somador tem **dois operandos de 13 bits = 26 bits de entrada**. A DE10-Lite oferece 10
-chaves e apenas **2 botões** (`KEY[1:0]`) — menos que a placa do livro, que tinha 4. O próprio
-livro reconhece a limitação e a resolve amarrando um operando a uma constante:
+O somador tem **dois operandos de 13 bits = 26 bits de entrada**. A DE10-Lite oferece apenas 10
+chaves e 2 botões.
+
+O livro resolve a limitação de inputs amarrando um operando a uma constante:
 
 ```vhdl
 -- Listing 3.20, original do livro (placa S3, 8 chaves + 4 botões)
@@ -274,29 +275,30 @@ frac2 <= '1' & sw(6 downto 0);
 
 Isso torna a demonstração pobre: o operando 1 tem apenas 2 bits ajustáveis.
 
-### 3.2 O que a arquitetura original usava, e o que mudamos
+A seguir detalhamos as mudanças que efetuamos para a entrada de dados.
 
-| | Original (Listing 3.20, Spartan-3 / S3) | Nossa adaptação (DE10-Lite) |
+### 3.2 Mudanças efetuadas
+
+| | Original do Livro-texto | Nossa adaptação (DE10-Lite) |
 |---|---|---|
 | **Displays** | 4 dígitos **multiplexados no tempo**, com `an(3:0)` de seleção e um único barramento `sseg` compartilhado | 6 dígitos **estáticos e independentes** (`HEX0`..`HEX5`), cada um com seus 8 pinos próprios |
-| **Módulo `disp_mux`** | obrigatório, junto com um divisor de clock para varrer os dígitos | **removido** — a DE10-Lite não multiplexa displays |
+| **Módulo `disp_mux`** | obrigatório, junto com um divisor de clock para varrer os dígitos | **removido** já que a DE10-Lite não multiplexa displays |
 | **Uso do clock** | varredura dos displays | **apenas** para registrar os operandos |
 | **Entrada do operando 1** | constante fixa (`exp1="1000"`, `frac1` com 2 bits de chave) | **totalmente ajustável** |
 | **Entrada do operando 2** | `sign2`=1 chave, `exp2`=4 botões, `frac2`=7 chaves | **totalmente ajustável** |
 | **Botões** | `btn(3:0)` alimentando o expoente diretamente | `KEY0` = carregar campo, `KEY1` = reiniciar |
-| **Sinal negativo** | `led3` com padrão de barra central, num dígito multiplexado | `HEX3` dedicado, constante `SSEG_MENOS` |
-| **Estouro de expoente** | não sinalizado — dava a volta em silêncio | **`C` no HEX5** + `LEDR(8)` |
+| **Sinal negativo** | `led3` com padrão de barra central, num dígito multiplexado | `HEX3` dedicado |
+| **Estouro de expoente** | não sinalizado | **`C` no HEX5** + `LEDR(8)` |
 | **Visualização dos operandos** | inexistente | `SW(7)` alterna operando/resultado |
-| **Nível lógico dos displays** | ativo-baixo | ativo-baixo (igual — o `hex_to_sseg` foi reaproveitado sem mudança) |
+| **Nível lógico dos displays** | ativo-baixo | ativo-baixo (`hex_to_sseg` foi reaproveitado sem mudança) |
 
 **O que mudamos, item a item:**
 
 * **Removemos** o módulo `disp_mux` e o divisor de clock associado. Na DE10-Lite cada um dos
-  seis displays tem pinos dedicados, então a multiplexação temporal — necessária na S3 —
-  seria hardware inútil consumindo lógica e introduzindo cintilação.
+  seis displays tem pinos dedicados, então a multiplexação temporal não é necessária na nossa placa.
 * **Removemos** as constantes amarradas ao operando 1. Nenhum campo do formato permanece fixo.
 * **Roteamos** as saídas para `HEX0`..`HEX5`, `LEDR(9:0)`, `KEY(1:0)` e `SW(9:0)` conforme o
-  manual da DE10-Lite, importando as atribuições de pino do arquivo oficial `DE10_LITE.qsf`.
+  manual da DE10-Lite, importando as atribuições de pino do arquivo oficial `DE10_LITE.qsf` fornecido em Lab.
 * **Reorganizamos** a entrada num **protocolo de multiplexação por campo**: `SW(9:8)` escolhe
   qual dos quatro campos receberá `SW(6:0)` quando `KEY0` for pressionado. Quatro cargas
   sucessivas descrevem os 26 bits usando 7 chaves de dado.
@@ -304,17 +306,11 @@ Isso torna a demonstração pobre: o operando 1 tem apenas 2 bits ajustáveis.
   de espalhar operandos e resultado por dígitos separados.
 * **Acrescentamos** o indicador `C` de estouro do expoente, deduzido **fora** do somador.
 * **Acrescentamos** o seletor de display `SW(7)`, que permite conferir cada operando antes de
-  ler o resultado — indispensável quando a entrada é feita em quatro etapas.
+  ler o resultado.
 
-### 3.3 O somador em si não foi tocado
+### 3.3 O somador em si não foi alterado
 
-`fp_adder.vhd` está **byte a byte idêntico** à Listing 3.19, com uma única mudança
-cosmética: indentação e comentários de seção. Nenhuma expressão, nenhum sinal, nenhuma
-condição foi alterada. Todas as adaptações vivem no wrapper `fp_adder_demo.vhd`.
-
-Essa restrição foi deliberada: o enunciado pede validar o projeto teórico e adaptá-lo ao
-hardware, não reprojetá-lo. As limitações que encontramos (§3.7) estão documentadas como
-achados, não corrigidas silenciosamente.
+`fp_adder.vhd` está **idêntico** à Listing 3.19, com mudanças apenas de indentação e comentários. Todas as adaptações vivem no wrapper `fp_adder_demo.vhd`.
 
 ### 3.4 Protocolo de entrada por campo
 
@@ -348,8 +344,8 @@ flowchart LR
 
 | Botão | Função | Observação |
 |---|---|---|
-| `KEY0` | carrega o campo apontado por `SW(9:8)` | ativo-baixo; **carga idempotente** |
-| `KEY1` | reinicia ambos os operandos em `+1,0` | autoteste: o resultado deve ser `2,0` |
+| `KEY0` | carrega o campo apontado por `SW(9:8)` | ativo-baixo |
+| `KEY1` | reinicia ambos os operandos em `+1,0` | - |
 
 ### 3.5 Normalização da entrada
 
@@ -357,15 +353,10 @@ flowchart LR
 frac_in <= '1' & SW(6 downto 0);
 ```
 
-O bit 7 da fração não é ajustável. Consequência: **é impossível digitar um operando
-desnormalizado.** Isso importa porque o primeiro estágio compara `exp & frac` como um inteiro
+O bit 7 da fração não é ajustável, assim é impossível digitar um operando
+desnormalizado. Isso é relevante pois o primeiro estágio compara `exp & frac` como um inteiro
 de 12 bits, e essa comparação só é válida se ambos os operandos estiverem normalizados. Com
-entrada desnormalizada, o somador elege o operando errado como "maior" e produz lixo — sem
-qualquer sinalização.
-
-Garantir a precondição custou **um fio ligado em `'1'`**. Corrigir o sintoma dentro do somador
-exigiria alinhar antes de comparar, mas só se sabe quanto alinhar depois de saber quem é o
-maior — um problema circular.
+entrada desnormalizada, o somador elege o operando errado como "maior", resultando em output incorreto.
 
 ### 3.6 Layout dos displays
 
@@ -384,8 +375,8 @@ sobrou quando `expb + 1` não coube nos 4 bits do campo.
 
 | Display | Conteúdo | Fonte |
 |---|---|---|
-| `HEX5` | `C` de **carry** — o expoente estourou; apagado caso contrário | constante `SSEG_C` |
-| `HEX4` | sempre apagado — separador visual | constante `SSEG_APAGADO` |
+| `HEX5` | `C` de **carry**: o expoente estourou; apagado caso contrário | constante `SSEG_C` |
+| `HEX4` | sempre apagado | - |
 | `HEX3` | `-` quando o valor exibido é negativo | constante `SSEG_MENOS` |
 | `HEX2` | expoente (0–F), com ponto decimal **sempre aceso** | `hex_to_sseg` |
 | `HEX1` | fração, nibble alto | `hex_to_sseg` |
@@ -395,7 +386,7 @@ Exemplos de leitura:
 
 ```
    C _ -  0.  F  F     →   −(0xFF / 256) × 2^16  =  −65280
-   _ _ _  5.  8  0     →    (0x80 / 256) × 2^5   =       16
+   _ _ _  5.  8  0     →    (0x80 / 256) × 2^5   =      16
 ```
 
 | LED | Significado |
@@ -403,7 +394,7 @@ Exemplos de leitura:
 | `LEDR(9)` | sinal do resultado |
 | `LEDR(8)` | carry do expoente (visível mesmo exibindo um operando) |
 | `LEDR(7)` | display atual (aceso = resultado) |
-| `LEDR(6:0)` | eco de `SW(6:0)` — confere o dado antes de carregar |
+| `LEDR(6:0)` | eco de `SW(6:0)` para conferencia do dado antes de carregar |
 
 ### 3.7 Detecção de estouro sem alterar o somador
 
