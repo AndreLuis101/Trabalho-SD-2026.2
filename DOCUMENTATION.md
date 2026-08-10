@@ -1292,19 +1292,20 @@ nossa.
 
 ## 6. Contribuição dos participantes
 
-Taxonomia **CRediT** (<https://credit.niso.org/>).
+Segundo a taxonomia **CRediT** (<https://credit.niso.org/>). O trabalho foi conduzido de forma
+bastante colaborativa, assim as atribuições abaixo indicam **onde cada um concentrou esforço**, e
+não exclusividade:
 
-* **[Nome do Aluno 1]** — Administração do Projeto; Desenvolvimento, implementação e teste de
-  software (VHDL do wrapper `fp_adder_demo`, protocolo de entrada por campo, layout dos
-  displays); Análise Formal (dedução da detecção de estouro).
-* **[Nome do Aluno 2]** — Validação de dados e experimentos (execução das simulações no
-  Questa, conferência do 4º estágio nas formas de onda, testes na placa DE10-Lite);
-  Investigação (síntese e gravação no Quartus).
-* **[Nome do Aluno 3]** — Redação do manuscrito original (este documento); Curadoria de dados
-  (registro e auditoria do uso de IA); Validação de dados e experimentos.
+* **Kayky de Brito dos Santos** — Administração do projeto; Software (wrapper
+  `fp_adder_demo`, protocolo de entrada por campo, layout dos displays); Análise formal
+  (dedução da detecção de estouro do expoente); Metodologia (definição dos casos de teste);.
+* **Igor Domingos da Silva Mozetic** — Software (testbench e script de simulação); Validação
+  (execução das simulações no Questa e conferência do 4º estágio); Recursos (montagem do
+  projeto no Quartus, pinagem e gravação da placa); Curadoria de dados.
+* **André Luis Penha da Silva** — Redação do rascunho original; Visualização (formas de onda,
+  diagramas e fotografias da bancada); Conceituação; Curadoria de dados (registro e auditoria do uso de IA).
 
-> **[placeholder]** — substituir os nomes e ajustar a divisão de papéis conforme a realidade
-> do grupo.
+As etapas de investigação, validação e revisão do texto foram feitas pelos três integrantes em conjunto.
 
 ---
 
