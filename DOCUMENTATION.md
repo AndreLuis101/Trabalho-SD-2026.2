@@ -2,7 +2,7 @@
 
 **Autores:** Kayky de Brito dos Santos, Igor Domingos da Silva Mozetic, Andre Luis Penha da Silva
 
-**Disciplina:** MCTA024 — Sistemas Digitais — Q2.2026
+**Disciplina:** MCTA024 - Sistemas Digitais - Q2.2026
 
 **Data:** 10 de agosto de 2026
 
@@ -12,7 +12,7 @@
 
 | Seção | Conteúdo | Etapa da disciplina |
 |---|---|---|
-| [1](#1-objetivo-do-projeto) | Objetivo do projeto | — |
+| [1](#1-objetivo-do-projeto) | Objetivo do projeto | - |
 | [2](#2-descrição-gráfica-do-funcionamento-do-sistema) | Descrição gráfica do funcionamento | Etapa 1 |
 | [3](#3-adaptações-de-hardware-de10-lite) | Adaptações de hardware | Etapa 2 |
 | [4](#4-evidências-de-validação) | Evidências de validação (simulação, código, placa) | Etapas 2 e 3 |
@@ -26,12 +26,12 @@
 ## 1. Objetivo do Projeto
 
 Este projeto adapta o somador de ponto flutuante simplificado de 13 bits da Listing 3.19 de
-*FPGA Prototyping by VHDL Examples* (Pong P. Chu, §3.7.4) — escrito para a placa Digilent S3
-com Spartan-3 — para a placa **Terasic DE10-Lite** (Intel MAX 10, `10M50DAF484C7G`).
+*FPGA Prototyping by VHDL Examples* (Pong P. Chu, §3.7.4) – escrito para a placa Digilent S3
+com Spartan-3 – para a placa **Terasic DE10-Lite** (Intel MAX 10, `10M50DAF484C7G`).
 
 O objetivo é validar o algoritmo original por simulação, adequá-lo aos recursos físicos da
 placa que temos, sintetizá-lo no Quartus Prime e demonstrar seu funcionamento no hardware
-real, documentando o processo — inclusive o uso de IA.
+real, documentando o processo, inclusive o uso de IA.
 
 ### Formato numérico
 
@@ -43,9 +43,9 @@ $$
 
 | Campo | Largura | Domínio |
 |---|---|---|
-| $s$ — sinal | 1 bit | $s \in \{0, 1\}$, com $s = 1$ indicando número negativo |
-| $e$ — expoente | 4 bits | $e \in [0, 15]$, inteiro **sem sinal**, sem excesso (*bias*) |
-| $f$ — fração | 8 bits | $f \in [128, 255]$ — normalizada, bit 7 sempre `'1'` |
+| $s$: sinal | 1 bit | $s \in \{0, 1\}$, com $s = 1$ indicando número negativo |
+| $e$: expoente | 4 bits | $e \in [0, 15]$, inteiro **sem sinal**, sem excesso (*bias*) |
+| $f$: fração | 8 bits | $f \in [128, 255]$ – normalizada, bit 7 sempre `'1'` |
 
 Equivalentemente, na notação do livro, $v = (-1)^{s} \times 0.f \times 2^{e}$, já que
 $f / 256$ é exatamente a fração binária $0.f$ com 8 casas.
@@ -60,7 +60,7 @@ $$
 
 #### Exemplo de conversão: 70,5
 
-**Ida — de decimal para o formato.** Escreve-se o número em binário e desloca-se a vírgula
+**Ida: de decimal para o formato.** Escreve-se o número em binário e desloca-se a vírgula
 até que só reste `0,` à esquerda, contando os deslocamentos:
 
 $$
@@ -74,15 +74,20 @@ deslocamento teria parado cedo demais.
 
 Resultado: `0 0111 10001101`.
 
-**Volta — do formato para decimal.** Basta aplicar a fórmula aos três campos:
+**Volta: do formato para decimal.** Basta aplicar a fórmula aos três campos:
 
 $$
 v = (-1)^{0} \times \frac{141}{256} \times 2^{7} = 0{,}55078125 \times 128 = 70{,}5
 $$
 
-A conversão neste caso é **exata** nos dois sentidos. Isso não é verdade para todos os números: 
-`3,14159`, por exemplo, é representável apenas como `3,140625` 
-— a página `debug/fp_adder_debug.html` (§5) classifica cada entrada em exata, aproximada ou fora de faixa.
+A conversão neste caso é **exata** nos dois sentidos. Isso não é verdade para todos os números:
+`0,52`, por exemplo, não é representável e vira `0,51953125`.
+
+Para facilitar a conversão, montamos uma
+[**planilha de conversão**](https://docs.google.com/spreadsheets/d/1j_V8zEg76kGf2R_ZsYSh-g7Jo0E3Xsyr38fk7qrj2FQ/edit)
+que opera nos dois sentidos:
+
+![Planilha de conversão entre decimal e expoente + fração](img/planilha-conversor.png)
 
 ---
 
