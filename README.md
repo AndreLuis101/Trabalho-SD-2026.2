@@ -1,8 +1,8 @@
 # Tutorial: Implementação de Somador de Ponto Flutuante na DE10-Lite
 
-**Autores:** Kayky de Brito dos Santos, Igor Domingos da Silva Mozetic, Andre Luis Penha da Silva
+**Autores:** André Luis Penha da Silva, Igor Domingos da Silva Mozetic, Kayky de Brito dos Santos 
 
-**Disciplina:** MCTA024 — Sistemas Digitais — Q2.2026
+**Disciplina:** MCTA024 - Sistemas Digitais - Q2.2026
 
 **Data:** 10 de agosto de 2026
 
@@ -12,7 +12,7 @@
 
 | Seção | Conteúdo | Etapa da disciplina |
 |---|---|---|
-| [1](#1-objetivo-do-projeto) | Objetivo do projeto | Etapa 1 |
+| [1](#1-objetivo-do-projeto) | Objetivo do projeto | - |
 | [2](#2-descrição-gráfica-do-funcionamento-do-sistema) | Descrição gráfica do funcionamento | Etapa 1 |
 | [3](#3-adaptações-de-hardware-de10-lite) | Adaptações de hardware | Etapa 2 |
 | [4](#4-evidências-de-validação) | Evidências de validação (simulação, código, placa) | Etapas 2 e 3 |
@@ -26,12 +26,12 @@
 ## 1. Objetivo do Projeto
 
 Este projeto adapta o somador de ponto flutuante simplificado de 13 bits da Listing 3.19 de
-*FPGA Prototyping by VHDL Examples* (Pong P. Chu, §3.7.4) — escrito para a placa Digilent S3
-com Spartan-3 — para a placa **Terasic DE10-Lite** (Intel MAX 10, `10M50DAF484C7G`).
+*FPGA Prototyping by VHDL Examples* (Pong P. Chu, §3.7.4) – escrito para a placa Digilent S3
+com Spartan-3 – para a placa **Terasic DE10-Lite** (Intel MAX 10, `10M50DAF484C7G`).
 
 O objetivo é validar o algoritmo original por simulação, adequá-lo aos recursos físicos da
 placa que temos, sintetizá-lo no Quartus Prime e demonstrar seu funcionamento no hardware
-real, documentando o processo — inclusive o uso de IA.
+real, documentando o processo, inclusive o uso de IA.
 
 ### Formato numérico
 
@@ -43,22 +43,12 @@ $$
 
 | Campo | Largura | Domínio |
 |---|---|---|
-| $s$ — sinal | 1 bit | $s \in \{0, 1\}$, com $s = 1$ indicando número negativo |
-| $e$ — expoente | 4 bits | $e \in [0, 15]$, inteiro **sem sinal**, sem excesso (*bias*) |
-| $f$ — fração | 8 bits | $f \in [128, 255]$ — normalizada, bit 7 sempre `'1'` |
+| $s$: sinal | 1 bit | $s \in \{0, 1\}$, com $s = 1$ indicando número negativo |
+| $e$: expoente | 4 bits | $e \in [0, 15]$, inteiro **sem sinal**, sem excesso (*bias*) |
+| $f$: fração | 8 bits | $f \in [128, 255]$ – normalizada, bit 7 sempre `'1'` |
 
 Equivalentemente, na notação do livro, $v = (-1)^{s} \times 0.f \times 2^{e}$, já que
 $f / 256$ é exatamente a fração binária $0.f$ com 8 casas.
-
-Diferenças relevantes em relação ao IEEE 754, que explicam várias decisões deste trabalho:
-
-| | Nosso Somador | IEEE 754 |
-|---|---|---|
-| Bit mais significativo da fração | **armazenado** (gasta 1 bit para guardar uma constante) | implícito |
-| Expoente | inteiro sem sinal, sem bias — só expoentes positivos | com excesso (bias) |
-| Faixa | $[0{,}5;\ 32640]$ em magnitude | muito maior |
-| Zero | não é representável de forma canônica (bit 7 forçado) | codificação reservada |
-| Arredondamento | inexistente — truncamento puro | 5 modos |
 
 Os extremos de magnitude não nula são, portanto:
 
@@ -67,6 +57,37 @@ v_{\min} = \frac{128}{256} \times 2^{0} = 0{,}5
 \qquad\qquad
 v_{\max} = \frac{255}{256} \times 2^{15} = 32640
 $$
+
+#### Exemplo de conversão: 70,5
+
+**Ida: de decimal para o formato.** Escreve-se o número em binário e desloca-se a vírgula
+até que só reste `0,` à esquerda, contando os deslocamentos:
+
+$$
+70{,}5_{10} = 1000110{,}1_{2} = \underbrace{0{,}10001101_{2}}_{f} \times 2^{\overbrace{7}^{e}}
+$$
+
+Foram **7** casas, então $e = 7 = 0111_2$. Os oito bits após a vírgula são a fração,
+$f = 10001101_2 = 0\text{x}8D = 141$. O número é positivo, logo $s = 0$. O bit mais à
+esquerda de $f$ sempre deve ser `'1'`, como exige a normalização, caso contrário o
+deslocamento teria parado cedo demais.
+
+Resultado: `0 0111 10001101`.
+
+**Volta: do formato para decimal.** Basta aplicar a fórmula aos três campos:
+
+$$
+v = (-1)^{0} \times \frac{141}{256} \times 2^{7} = 0{,}55078125 \times 128 = 70{,}5
+$$
+
+A conversão neste caso é **exata** nos dois sentidos. Isso não é verdade para todos os números:
+`0,52`, por exemplo, não é representável e vira `0,51953125`.
+
+Para facilitar a conversão, montamos uma
+[**planilha de conversão**](https://docs.google.com/spreadsheets/d/1j_V8zEg76kGf2R_ZsYSh-g7Jo0E3Xsyr38fk7qrj2FQ/edit)
+que opera nos dois sentidos:
+
+![Planilha de conversão entre decimal e expoente + fração](img/planilha-conversor.png)
 
 ---
 
@@ -84,11 +105,9 @@ flowchart TD
     DEMO --> S0["hex_to_sseg.vhd<br/>HEX0 — frac[3:0]"]
 ```
 
-### 2.2 O algoritmo em quatro estágios (`fp_adder.vhd`)
+### 2.2 Estágios (`fp_adder.vhd`)
 
-O somador é **puramente combinacional**: não tem clock, nem reset, nem estado. Não existe
-máquina de estados a documentar dentro dele — o diagrama abaixo é de fluxo de dados, não de
-estados.
+Como o somador é puramente combinacional, ele opera sem sinais de clock ou reset. O diagrama abaixo detalha o fluxo de dados do circuito, sem a necessidade de uma máquina de estados:
 
 ```mermaid
 flowchart TD
@@ -113,33 +132,31 @@ flowchart TD
     N3 --> OUT
 ```
 
-### 2.3 O quarto estágio em detalhe (ponto de observação da Etapa 1)
+### 2.3 Quarto Estágio
 
-**(a) Contagem de zeros à esquerda — `leado`**, um codificador de prioridade que varre
-`sum(7)` para baixo:
+**(a) Contagem de zeros à esquerda (`leado`)**: codificador de prioridade que identifica o bit '1' mais significativo a partir de `sum(7)`:
 
-| Condição | `leado` | Significado |
-|---|---|---|
-| `sum(7) = '1'` | 0 | já normalizado |
-| `sum(6) = '1'` | 1 | 1 zero à esquerda |
-| `sum(5) = '1'` | 2 | 2 zeros |
-| `sum(4) = '1'` | 3 | 3 zeros |
-| `sum(3) = '1'` | 4 | 4 zeros |
-| `sum(2) = '1'` | 5 | 5 zeros |
-| `sum(1) = '1'` | 6 | 6 zeros |
-| caso contrário | 7 | `sum(0)` ou tudo zero |
+| Condição       | `leado` | Descrição                        |
+| -------------- | ------- | -------------------------------- |
+| `sum(7) = '1'` | 0       | Já normalizado                   |
+| `sum(6) = '1'` | 1       | 1 zero à esquerda                |
+| `sum(5) = '1'` | 2       | 2 zeros à esquerda               |
+| `sum(4) = '1'` | 3       | 3 zeros à esquerda               |
+| `sum(3) = '1'` | 4       | 4 zeros à esquerda               |
+| `sum(2) = '1'` | 5       | 5 zeros à esquerda               |
+| `sum(1) = '1'` | 6       | 6 zeros à esquerda               |
+| Outros casos   | 7       | Bit `sum(0)` ativo ou valor nulo |
 
-**(b) Deslocador barrel (`sum_norm`)**: desloca `sum(7 downto 0)` à esquerda por `leado`,
-preenchendo com zeros.
+**(b) Deslocamento de normalização (`sum_norm`)**: desloca `sum(7 downto 0)` à esquerda de acordo com o valor de `leado`, preenchendo os bits restantes com zero.
 
-**(c) Decisão final**, com os **quatro casos** cobertos pelos testes:
+**(c) Ajuste final**: cobre as quatro condições de borda validadas na simulação:
 
-| Caso | Condição | Ação | Exemplo do livro |
-|---|---|---|---|
-| **I — sem ajuste** | `sum(8)=0`, `leado=0` | `expn = expb`, `fracn = sum` | eg. 1: `−0.82E4` |
-| **II — desloca à esquerda** | `sum(8)=0`, `0 < leado ≤ expb` | `expn = expb − leado` | eg. 2: `−0.01E3 → −0.10E2` |
-| **III — vira zero** | `sum(8)=0`, `leado > expb` | `expn = 0`, `fracn = 0` | eg. 3: `−0.01E0 → −0.00E0` |
-| **IV — vai-um** | `sum(8)=1` | `expn = expb + 1`, desloca 1 à direita | eg. 4: `+1.07E3 → +0.10E4` |
+| Caso                             | Condição                       | Ação                                                                           | Referência do Livro            |
+| -------------------------------- | ------------------------------ | ------------------------------------------------------------------------------ | ------------------------------ |
+| **I — Sem ajuste**               | `sum(8)=0`, `leado=0`          | Mantém `expn = expb` e `fracn = sum`                                           | Ex. 1: `−0.82E4`<br>           |
+| **II — Normalização à esquerda** | `sum(8)=0`, `0 < leado ≤ expb` | Decrementa o expoente (`expn = expb − leado`)                                  | Ex. 2: `−0.01E3 → −0.10E2`<br> |
+| **III — Underflow (zerado)**     | `sum(8)=0`, `leado > expb`     | Força `expn = 0` e `fracn = 0`                                                 | Ex. 3: `−0.01E0 → −0.00E0`<br> |
+| **IV — Carry-out no MSB**        | `sum(8)=1`                     | Incrementa o expoente (`expn = expb + 1`) e desloca a mantissa 1 bit à direita | Ex. 4: `+1.07E3 → +0.10E4`<br> |
 
 ### 2.4 Tabela verdade do decodificador (`hex_to_sseg.vhd`)
 
@@ -148,25 +165,29 @@ e validado essa lógica em VHDL. A numeração dos segmentos é a mesma vista l�
 
 ![Decodificador e display de sete segmentos](img/seven-segment-decoder-lab3.png)
 
-*Fig. 12 do roteiro do Lab 3 — decodificador e "Seven Segment Display".*
+_Fig. 12 do roteiro do Lab 3 — decodificador e "Seven Segment Display"._
 
 Os índices da figura correspondem diretamente aos bits do vetor de saída: o segmento `0` é o
 traço superior (`a`), e a numeração segue no sentido horário até o `5` (`f`), com o `6` sendo
 o traço central (`g`).
 
-Displays da DE10-Lite são **ativos em nível baixo** (`'0'` acende o segmento). Ordem dos bits:
-`sseg(6..0) = g f e d c b a`, e `sseg(7) = not dp`.
+Os displays de 7 segmentos da DE10-Lite operam em **lógica invertida (ativo em nível baixo)**, ou seja, o bit `'0'` acende o segmento.
 
-| `hex` | Dígito | `sseg(6:0)` | | `hex` | Dígito | `sseg(6:0)` |
-|---|---|---|---|---|---|---|
-| 0000 | 0 | `1000000` | | 1000 | 8 | `0000000` |
-| 0001 | 1 | `1111001` | | 1001 | 9 | `0010000` |
-| 0010 | 2 | `0100100` | | 1010 | A | `0001000` |
-| 0011 | 3 | `0110000` | | 1011 | b | `0000011` |
-| 0100 | 4 | `0011001` | | 1100 | C | `0100111` |
-| 0101 | 5 | `0010010` | | 1101 | d | `0100001` |
-| 0110 | 6 | `0000010` | | 1110 | E | `0000110` |
-| 0111 | 7 | `1111000` | | 1111 | F | `0001110` |
+O mapeamento dos bits segue o padrão:
+
+- `sseg(6 downto 0)` = `g f e d c b a`
+- `sseg(7)` = `not dp` (ponto decimal)
+
+| `hex` | Dígito | `sseg(6:0)` |     | `hex` | Dígito | `sseg(6:0)` |
+| ----- | ------ | ----------- | --- | ----- | ------ | ----------- |
+| 0000  | 0      | `1000000`   |     | 1000  | 8      | `0000000`   |
+| 0001  | 1      | `1111001`   |     | 1001  | 9      | `0010000`   |
+| 0010  | 2      | `0100100`   |     | 1010  | A      | `0001000`   |
+| 0011  | 3      | `0110000`   |     | 1011  | b      | `0000011`   |
+| 0100  | 4      | `0011001`   |     | 1100  | C      | `0100111`   |
+| 0101  | 5      | `0010010`   |     | 1101  | d      | `0100001`   |
+| 0110  | 6      | `0000010`   |     | 1110  | E      | `0000110`   |
+| 0111  | 7      | `1111000`   |     | 1111  | F      | `0001110`   |
 
 Um padrão usado no projeto **não está nesta tabela**: `0111111`, que acende apenas o segmento
 `g` e desenha um traço. É o que o `HEX3` exibe quando o número mostrado é negativo.
@@ -199,9 +220,7 @@ aparece nos displays. Com `SW(7) = '1'`, os displays mostram o resultado.
 
 ### 2.6 Fluxo de operação na placa
 
-O único elemento sequencial do sistema são os seis registradores de operando. O
-comportamento é o de um banco de registradores com escrita seletiva — não há máquina de
-estados com transições condicionais, então o diagrama abaixo descreve o fluxo de uso:
+O circuito possui como único elemento sequencial o conjunto de seis registradores de entrada. O sistema atua como um banco de registradores com escrita seletiva, sem o uso de máquinas de estados. O fluxo de uso na placa segue a sequência descrita abaixo:
 
 ```mermaid
 stateDiagram-v2
@@ -226,21 +245,20 @@ stateDiagram-v2
     end note
 ```
 
-O caminho combinacional — soma, seleção do que exibir e decodificação para os sete segmentos —
-é contínuo: qualquer mudança nos registradores ou na chave de display aparece nos dígitos no
-mesmo instante, sem esperar borda de clock.
+O processamento combinacional, que abrange a soma, a seleção do sinal de exibição e a decodificação para os displays de sete segmentos, ocorre de forma contínua. Qualquer alteração nos registradores ou nas chaves de seleção atualiza os dígitos instantaneamente, sem a necessidade de uma borda de clock.
 
 ---
 
-*Etapa 2*
+_Etapa 2_
 
 ## 3. Adaptações de Hardware (DE10-Lite)
 
-### 3.1 O problema central: 26 bits de entrada, 10 chaves
+### 3.1 Entrada de Dados Original
 
-O somador tem **dois operandos de 13 bits = 26 bits de entrada**. A DE10-Lite oferece 10
-chaves e apenas **2 botões** (`KEY[1:0]`) — menos que a placa do livro, que tinha 4. O próprio
-livro reconhece a limitação e a resolve amarrando um operando a uma constante:
+O somador tem **dois operandos de 13 bits = 26 bits de entrada**. A DE10-Lite oferece apenas 10
+chaves e 2 botões.
+
+O livro resolve a limitação de inputs amarrando um operando a uma constante:
 
 ```vhdl
 -- Listing 3.20, original do livro (placa S3, 8 chaves + 4 botões)
@@ -254,29 +272,30 @@ frac2 <= '1' & sw(6 downto 0);
 
 Isso torna a demonstração pobre: o operando 1 tem apenas 2 bits ajustáveis.
 
-### 3.2 O que a arquitetura original usava, e o que mudamos
+A seguir detalhamos as mudanças que efetuamos para a entrada de dados.
 
-| | Original (Listing 3.20, Spartan-3 / S3) | Nossa adaptação (DE10-Lite) |
+### 3.2 Mudanças efetuadas
+
+| | Original do Livro-texto | Nossa adaptação (DE10-Lite) |
 |---|---|---|
 | **Displays** | 4 dígitos **multiplexados no tempo**, com `an(3:0)` de seleção e um único barramento `sseg` compartilhado | 6 dígitos **estáticos e independentes** (`HEX0`..`HEX5`), cada um com seus 8 pinos próprios |
-| **Módulo `disp_mux`** | obrigatório, junto com um divisor de clock para varrer os dígitos | **removido** — a DE10-Lite não multiplexa displays |
+| **Módulo `disp_mux`** | obrigatório, junto com um divisor de clock para varrer os dígitos | **removido** já que a DE10-Lite não multiplexa displays |
 | **Uso do clock** | varredura dos displays | **apenas** para registrar os operandos |
 | **Entrada do operando 1** | constante fixa (`exp1="1000"`, `frac1` com 2 bits de chave) | **totalmente ajustável** |
 | **Entrada do operando 2** | `sign2`=1 chave, `exp2`=4 botões, `frac2`=7 chaves | **totalmente ajustável** |
 | **Botões** | `btn(3:0)` alimentando o expoente diretamente | `KEY0` = carregar campo, `KEY1` = reiniciar |
-| **Sinal negativo** | `led3` com padrão de barra central, num dígito multiplexado | `HEX3` dedicado, constante `SSEG_MENOS` |
-| **Estouro de expoente** | não sinalizado — dava a volta em silêncio | **`C` no HEX5** + `LEDR(8)` |
+| **Sinal negativo** | `led3` com padrão de barra central, num dígito multiplexado | `HEX3` dedicado |
+| **Estouro de expoente** | não sinalizado | **`C` no HEX5** + `LEDR(8)` |
 | **Visualização dos operandos** | inexistente | `SW(7)` alterna operando/resultado |
-| **Nível lógico dos displays** | ativo-baixo | ativo-baixo (igual — o `hex_to_sseg` foi reaproveitado sem mudança) |
+| **Nível lógico dos displays** | ativo-baixo | ativo-baixo (`hex_to_sseg` foi reaproveitado sem mudança) |
 
 **O que mudamos, item a item:**
 
 * **Removemos** o módulo `disp_mux` e o divisor de clock associado. Na DE10-Lite cada um dos
-  seis displays tem pinos dedicados, então a multiplexação temporal — necessária na S3 —
-  seria hardware inútil consumindo lógica e introduzindo cintilação.
+  seis displays tem pinos dedicados, então a multiplexação temporal não é necessária na nossa placa.
 * **Removemos** as constantes amarradas ao operando 1. Nenhum campo do formato permanece fixo.
 * **Roteamos** as saídas para `HEX0`..`HEX5`, `LEDR(9:0)`, `KEY(1:0)` e `SW(9:0)` conforme o
-  manual da DE10-Lite, importando as atribuições de pino do arquivo oficial `DE10_LITE.qsf`.
+  manual da DE10-Lite, importando as atribuições de pino do arquivo oficial `DE10_LITE.qsf` fornecido em Lab.
 * **Reorganizamos** a entrada num **protocolo de multiplexação por campo**: `SW(9:8)` escolhe
   qual dos quatro campos receberá `SW(6:0)` quando `KEY0` for pressionado. Quatro cargas
   sucessivas descrevem os 26 bits usando 7 chaves de dado.
@@ -284,17 +303,11 @@ Isso torna a demonstração pobre: o operando 1 tem apenas 2 bits ajustáveis.
   de espalhar operandos e resultado por dígitos separados.
 * **Acrescentamos** o indicador `C` de estouro do expoente, deduzido **fora** do somador.
 * **Acrescentamos** o seletor de display `SW(7)`, que permite conferir cada operando antes de
-  ler o resultado — indispensável quando a entrada é feita em quatro etapas.
+  ler o resultado.
 
-### 3.3 O somador em si não foi tocado
+### 3.3 O somador em si não foi alterado
 
-`fp_adder.vhd` está **byte a byte idêntico** à Listing 3.19, com uma única mudança
-cosmética: indentação e comentários de seção. Nenhuma expressão, nenhum sinal, nenhuma
-condição foi alterada. Todas as adaptações vivem no wrapper `fp_adder_demo.vhd`.
-
-Essa restrição foi deliberada: o enunciado pede validar o projeto teórico e adaptá-lo ao
-hardware, não reprojetá-lo. As limitações que encontramos (§3.7) estão documentadas como
-achados, não corrigidas silenciosamente.
+`fp_adder.vhd` está **idêntico** à Listing 3.19, com mudanças apenas de indentação e comentários. Todas as adaptações vivem no wrapper `fp_adder_demo.vhd`.
 
 ### 3.4 Protocolo de entrada por campo
 
@@ -328,8 +341,8 @@ flowchart LR
 
 | Botão | Função | Observação |
 |---|---|---|
-| `KEY0` | carrega o campo apontado por `SW(9:8)` | ativo-baixo; **carga idempotente** |
-| `KEY1` | reinicia ambos os operandos em `+1,0` | autoteste: o resultado deve ser `2,0` |
+| `KEY0` | carrega o campo apontado por `SW(9:8)` | ativo-baixo |
+| `KEY1` | reinicia ambos os operandos em `+1,0` | - |
 
 ### 3.5 Normalização da entrada
 
@@ -337,15 +350,10 @@ flowchart LR
 frac_in <= '1' & SW(6 downto 0);
 ```
 
-O bit 7 da fração não é ajustável. Consequência: **é impossível digitar um operando
-desnormalizado.** Isso importa porque o primeiro estágio compara `exp & frac` como um inteiro
+O bit 7 da fração não é ajustável, assim é impossível digitar um operando
+desnormalizado. Isso é relevante pois o primeiro estágio compara `exp & frac` como um inteiro
 de 12 bits, e essa comparação só é válida se ambos os operandos estiverem normalizados. Com
-entrada desnormalizada, o somador elege o operando errado como "maior" e produz lixo — sem
-qualquer sinalização.
-
-Garantir a precondição custou **um fio ligado em `'1'`**. Corrigir o sintoma dentro do somador
-exigiria alinhar antes de comparar, mas só se sabe quanto alinhar depois de saber quem é o
-maior — um problema circular.
+entrada desnormalizada, o somador elege o operando errado como "maior", resultando em output incorreto.
 
 ### 3.6 Layout dos displays
 
@@ -364,8 +372,8 @@ sobrou quando `expb + 1` não coube nos 4 bits do campo.
 
 | Display | Conteúdo | Fonte |
 |---|---|---|
-| `HEX5` | `C` de **carry** — o expoente estourou; apagado caso contrário | constante `SSEG_C` |
-| `HEX4` | sempre apagado — separador visual | constante `SSEG_APAGADO` |
+| `HEX5` | `C` de **carry**: o expoente estourou; apagado caso contrário | constante `SSEG_C` |
+| `HEX4` | sempre apagado | - |
 | `HEX3` | `-` quando o valor exibido é negativo | constante `SSEG_MENOS` |
 | `HEX2` | expoente (0–F), com ponto decimal **sempre aceso** | `hex_to_sseg` |
 | `HEX1` | fração, nibble alto | `hex_to_sseg` |
@@ -374,8 +382,8 @@ sobrou quando `expb + 1` não coube nos 4 bits do campo.
 Exemplos de leitura:
 
 ```
-   C _ -  2.  F  F     →   −(0xFF / 256) × 2^(2+16)  =  −65280
-   _ _ _  5.  8  0     →    (0x80 / 256) × 2^5       =   16
+   C _ -  0.  F  F     →   −(0xFF / 256) × 2^16  =  −65280
+   _ _ _  5.  8  0     →    (0x80 / 256) × 2^5   =      16
 ```
 
 | LED | Significado |
@@ -383,7 +391,7 @@ Exemplos de leitura:
 | `LEDR(9)` | sinal do resultado |
 | `LEDR(8)` | carry do expoente (visível mesmo exibindo um operando) |
 | `LEDR(7)` | display atual (aceso = resultado) |
-| `LEDR(6:0)` | eco de `SW(6:0)` — confere o dado antes de carregar |
+| `LEDR(6:0)` | eco de `SW(6:0)` para conferencia do dado antes de carregar |
 
 ### 3.7 Detecção de estouro sem alterar o somador
 
@@ -437,6 +445,17 @@ Questa. De dentro da pasta `fp_adder/`, no prompt do Questa:
 do sim_demo.do
 ```
 
+![Transcript do Questa com o comando do sim_demo.do](img/questa-do-sim-demo.png)
+
+*Invocação do script no Transcript, a partir da pasta do projeto.*
+
+A execução completa, da compilação ao veredito final:
+
+![Execução do sim_demo.do no Questa](img/sim-demo-execucao.gif)
+
+*Compilação, elaboração, montagem da janela Wave e o transcript rolando até
+`RESULTADO: todos os testes passaram.`*
+
 O script:
 
 1. recria a biblioteca `work`;
@@ -449,14 +468,24 @@ O script:
    display* em vez do padrão de bits dos segmentos;
 5. roda até o fim e dá zoom na janela.
 
-Warning benigno esperado em `t = 0`: `NUMERIC_STD.">": metavalue detected` — `leado` vale
-`UUU` no primeiro delta, antes de qualquer estímulo.
+Ao término, o Questa apresenta a janela Wave já organizada pelos divisores definidos no
+script — entradas da placa, displays, operandos registrados, estágios internos do somador,
+resultado e LEDs:
+
+![Questa após a execução do sim_demo.do, com a janela Wave preenchida](img/questa-wave-overview.png)
+
+*Simulação completa, 780 ns. Os divisores agrupam os sinais por papel, e o radix `sseg`
+converte os padrões de segmento no dígito exibido.*
 
 ### 4.2 Estratégia do testbench
 
-`fp_adder_demo_tb.vhd` é **auto-verificável** e tem uma característica incomum: ele **não lê
-os sinais internos do resultado**. Em vez disso, lê os seis displays de sete segmentos e os
-decodifica de volta para nibbles (função `sseg_to_nib`), reconstruindo o número exibido.
+O `fp_adder_demo_tb.vhd` calcula sozinho o valor esperado de cada caso e o compara com o que
+o circuito produziu, imprimindo `[ OK ]` ou `[ FALHOU ]` e um veredito final no transcript —
+não é preciso inspecionar as formas de onda para saber se passou.
+
+A comparação não usa os sinais internos do resultado: o testbench lê os seis displays de sete
+segmentos e os decodifica de volta para nibbles (função `sseg_to_nib`), reconstruindo o número
+exibido.
 
 ```mermaid
 flowchart LR
@@ -481,10 +510,18 @@ em dois pontos (alinhamento e deslocamento do vai-um), ambos sempre na mesma dir
 resultados abaixo do mínimo normalizável (`|valor| < 0,5`), o critério passa a ser
 `frac = 0` exato.
 
+Cada caso imprime os dois operandos, o valor esperado, a foto dos seis displays, o valor lido
+de volta a partir deles e o veredito. Ao final, o testbench consolida o resultado geral:
+
+![Transcript do Questa com o resultado dos testes](img/questa-transcript-resultado.png)
+
+*Trecho final do transcript: o caso `EG2`, o autoteste do reset e a linha
+`RESULTADO: todos os testes passaram.`*
+
 ### 4.3 Casos de teste
 
-Os quatro casos vêm diretamente da Table 1 do livro (§3.7.4), traduzidos para binário
-**mantendo o expoente e escolhendo a fração normalizada mais próxima**:
+Os quatro primeiros casos vêm diretamente da Table 1 do livro (§3.7.4), traduzidos para
+binário **mantendo o expoente e escolhendo a fração normalizada mais próxima**:
 
 | Decimal | Fração binária | Valor exato | Erro |
 |---|---|---|---|
@@ -494,646 +531,325 @@ Os quatro casos vêm diretamente da Table 1 do livro (§3.7.4), traduzidos para 
 | 0.56 | `0x8F` = 143 | 0,55859375 | 1,41 × 10⁻³ |
 | 0.52 | `0x85` = 133 | 0,51953125 | 4,69 × 10⁻⁴ |
 
-| Teste | Entrada | Caso de normalização exercitado | Comportamento esperado |
+| Teste | Entrada | Caso de normalização | Comportamento esperado |
 |---|---|---|---|
 | **EG1** | `+0.54E3 + (−0.87E4)` | **I** — sem ajuste | subtrai após alinhar 1 casa, permanece em E4 |
 | **EG2** | `+0.54E3 + (−0.55E3)` | **III** — vira zero | cancelamento quase total; precisa de 6 bits de deslocamento e só há 3 de expoente |
 | **EG3** | `+0.54E0 + (−0.55E0)` | **III** — vira zero | expoente no mínimo; equivale ao `−0.00E0` do livro |
 | **EG4** | `+0.56E3 + (+0.52E3)` | **IV** — vai-um | soma estoura 8 bits, expoente sobe para E4 |
-| **T10** | `KEY1` (reinício) | — | autoteste: `+1,0 + 1,0 = 2,0` exato |
 
-> **Sobre o EG2 não reproduzir literalmente o livro.** Em decimal, `0.54 − 0.55 = −0.01`
-> exige **um** dígito de deslocamento — fator 10, e `E3` cobre. Em binário,
-> `0x8A − 0x8D = −3` exige **seis** bits — fator 64, e `E3` não alcança. Um dígito decimal
-> vale ~3,3 bits. **Não é infidelidade ao livro: é a mesma regra, cobrada numa moeda de
-> expoente mais cara.** Com `E6` o mesmo par renormaliza corretamente para `−0,75` exato.
+A Table 1 não alcança todos os ramos do circuito — falta o caso II da normalização, o
+alinhamento saturado e o estouro do expoente. Seis casos complementares cobrem essas lacunas:
 
-O **caso II** (deslocamento à esquerda bem-sucedido) é exercitado pelo mesmo par de frações
-com expoente suficiente. Recomendamos acrescentar um `do_test("EG2b", '0', 6, 16#8A#, '1', 6,
-16#8D#)` ao testbench para deixar os quatro casos explicitamente cobertos por testes nomeados.
+| Teste | Entrada | O que exercita | Resultado esperado |
+|---|---|---|---|
+| **T5** | `+0.54E6 + (−0.55E6)` | **caso II** — deslocamento à esquerda pago pelo expoente | mesmo par do EG2 com expoente sobrando: `leado = 6` e `expb = 6`, renormaliza para **−0,75 exato** |
+| **T6** | `1,0 + 0,5` | potências de dois | **1,5 exato** — só representável porque apenas o bit 7 é forçado (§3.5) |
+| **T7** | `−24 + 4` | ordenação com o **operando 1** maior | subtrai e preserva o sinal do maior: **−20 exato** |
+| **T8** | `16384 + 0,996` | alinhamento saturado (`exp_diff = 15`) | a fração do menor é deslocada além dos 8 bits e some: **16384** |
+| **T9** | `a + (−a)` com `exp = 12` | cancelamento total com `expb ≥ 7` | zero com **expoente 5** — o zero não canônico, limitação conhecida do somador |
+| **T10** | `32640 + 32640` | **estouro do expoente** | `expn = 15 + 1` dá a volta; `HEX5` acende `C` e o valor lido é **65280** |
+| **T11** | `KEY1` (reinício) | autoteste do reset | `+1,0 + 1,0 = 2,0` exato |
+
 
 ### 4.4 Formas de onda — o 4º estágio (normalização)
 
-> **[placeholder — imagens a fornecer]**
-> Rodar `do sim_demo.do` no Questa e capturar a janela Wave para cada caso.
-> Os sinais que importam estão no divisor **"Estagios internos do somador"**:
-> `expb`, `exps`, `exp_diff`, `fracb`, `fracs`, `fraca`, `sum`, `leado`, `sum_norm`,
-> mais `exp_out` e `frac_out` no divisor "Resultado".
+As capturas abaixo vêm da janela Wave do Questa, com o cursor posicionado ao fim de cada caso.
+Os sinais relevantes estão no divisor **"Estagios internos do somador"** — `expb`, `exps`,
+`exp_diff`, `fracb`, `fracs`, `fraca`, `sum`, `leado`, `sum_norm` — mais `exp_out` e
+`frac_out` no divisor "Resultado".
 
 **Caso I — sem ajuste (EG1):** `sum(8)=0`, `leado=0`, resultado sai como está.
 
-![Waveform EG1 — normalização sem ajuste](placeholder-wave-eg1.png)
+![Waveform EG1 — normalização sem ajuste](img/wave-eg1-caso1.png)
 
-`[placeholder]` — esperado na captura: `expb=4`, `exps=3`, `exp_diff=1`, `fracb=0xDF`,
-`fraca=0x45`, `sum=0x09A`, `leado=0`, `sum_norm=0x9A`, `exp_out=4`, `frac_out=0x9A`,
-`sign_out='1'`.
+*`+0.54E3 + (−0.87E4)`. Cursor no fim do caso.*
 
-**Caso II — deslocamento à esquerda (EG2b, `E6`):** `leado > 0` e `leado ≤ expb`.
+Os quatro estágios, lidos na captura:
 
-![Waveform EG2b — deslocamento à esquerda](placeholder-wave-eg2b.png)
+| Estágio | Sinais | Leitura |
+|---|---|---|
+| **1 · ordenar** | `expb=0100`, `exps=0011`, `fracb=11011111`, `fracs=10001010` | o operando 2 (`E4`, `0xDF`) é o maior e vai para `b` |
+| **2 · alinhar** | `exp_diff=0001`, `fraca=01000101` | `0x8A` desloca 1 casa à direita e vira `0x45` |
+| **3 · subtrair** | `sum=010011010` | sinais opostos: `0xDF − 0x45 = 0x9A`, sem vai-um |
+| **4 · normalizar** | `leado=000`, `sum_norm=10011010` | o bit 7 de `0x9A` já está aceso, nada a deslocar |
 
-`[placeholder]` — esperado: `sum=0x003`, `leado=6`, `sum_norm=0xC0`, `exp_out=0`,
-`frac_out=0xC0` → `−0,75` exato. **Este é o caso que responde ao ponto de observação da
-Etapa 1: o circuito conta os zeros e desloca à esquerda corretamente.**
+Resultado: `sign_out=1`, `exp_out=4'd4`, `frac_out=8'h9A` — ou seja
+$-(154/256) \times 2^{4} = -9{,}625$, o valor exato da soma.
 
-**Caso III — resultado pequeno demais (EG2 em `E3` e EG3 em `E0`):** `leado > expb`.
+**Caso III — resultado pequeno demais:** `leado > expb`. Dois testes chegam aqui por caminhos
+diferentes, e vale ver os dois.
 
-![Waveform EG3 — resultado vira zero](placeholder-wave-eg3.png)
+**EG2 — `+0.54E3 + (−0.55E3)`:** o expoente não está no mínimo, mas continua insuficiente —
+3 unidades para uma dívida de 6.
 
-`[placeholder]` — esperado: `sum=0x003`, `leado=6`, `sum_norm=0xC0` **calculado corretamente
-mas descartado**, `exp_out=0`, `frac_out=0x00`. Vale a pena capturar esta forma de onda com
-atenção: ela mostra o deslocador acertando a resposta e o estágio de decisão jogando-a fora
-por falta de saldo no expoente.
+![Waveform EG2 — resultado vira zero](img/wave-eg2-caso3.png)
+
+*Ambos os operandos em `E3`, cursor no fim do caso.*
+
+| Estágio | Sinais | Leitura |
+|---|---|---|
+| **1 · ordenar** | `expb=exps=0011`, `fracb=10001101`, `fracs=10001010` | expoentes iguais, decide a fração: `0x8D > 0x8A` |
+| **2 · alinhar** | `exp_diff=0000`, `fraca=10001010` | diferença zero, nada a deslocar |
+| **3 · subtrair** | `sum=000000011` | `0x8D − 0x8A = 3`, valor correto e desnormalizado |
+| **4 · normalizar** | `leado=110` (6), `sum_norm=11000000` | seis zeros à esquerda; o deslocador produz `0xC0` |
+
+E é aqui que o resultado se perde: `leado = 6` é maior que `expb = 3`, então o ramo do
+descarte assume e a saída vai a `exp_out = 4'd0`, `frac_out = 8'h00`.
+
+O `sum_norm = 0xC0` visível na captura **é a resposta certa** — com expoente `3 − 6 = −3`
+valeria exatamente `−0,09375`. O deslocador fez seu trabalho; o que faltou foi expoente para
+pagar o deslocamento, e o formato não representa expoente negativo. `sign_out = 1` permanece,
+produzindo um zero negativo.
+
+**EG3 — `+0.54E0 + (−0.55E0)`:** o caso literal do livro (`eg. 3`, `−0.01E0 → −0.00E0`), com
+o expoente já no mínimo.
+
+![Waveform EG3 — expoente no mínimo](img/wave-eg3-caso3.png)
+
+*Ambos os operandos em `E0`, cursor no fim do caso.*
+
+Comparando com a captura do EG2, **muda apenas o `expb`** — `0000` no lugar de `0011`. Os
+estágios 1 a 3 produzem exatamente os mesmos valores (`exp_diff=0000`, `fracb=10001101`,
+`fraca=10001010`, `sum=000000011`), e o quarto estágio também: `leado=110`,
+`sum_norm=11000000`. A saída é a mesma: `exp_out=0000`, `frac_out=00000000`, `sign_out=1`.
+
+Os dois casos convergem para o mesmo lugar por motivos de intensidade diferente — no EG2
+faltavam 3 unidades de expoente, aqui faltam 6. **O descarte não depende de quão pequeno é o
+resultado, e sim de quanto expoente sobrou para pagar a normalização.**
 
 **Caso IV — vai-um (EG4):** `sum(8)='1'`.
 
-![Waveform EG4 — vai-um e incremento do expoente](placeholder-wave-eg4.png)
+![Waveform EG4 — vai-um e incremento do expoente](img/wave-eg4-caso4.png)
 
-`[placeholder]` — esperado: `fracb=0x8F`, `fraca=0x85`, `sum=0x114` (o bit 8 aceso),
-`exp_out=4`, `frac_out=0x8A` → `8,625` exato.
+*`+0.56E3 + (+0.52E3)`. Ambos os operandos em `E3` e com o mesmo sinal, cursor no fim do caso.*
 
-**Visão geral da simulação completa:**
+| Estágio | Sinais | Leitura |
+|---|---|---|
+| **1 · ordenar** | `expb=exps=0011`, `fracb=10001111`, `fracs=10000101` | expoentes iguais, `0x8F > 0x85` |
+| **2 · alinhar** | `exp_diff=0000`, `fraca=10000101` | nada a deslocar |
+| **3 · somar** | `sum=100010100` | sinais iguais: `0x8F + 0x85 = 0x114` — **o nono bit acendeu** |
+| **4 · normalizar** | ramo do vai-um | `expn = 3 + 1 = 4`, `fracn = sum(8 downto 1) = 0x8A` |
 
-![Waveform completa — todos os testes](placeholder-wave-geral.png)
+Saída: `sign_out=0`, `exp_out=0100`, `frac_out=10001010`, isto é
+$(138/256) \times 2^{4} = 8{,}625$ — exato.
 
-`[placeholder]`
+Vale reparar que `leado = 011` e `sum_norm = 10100000` também aparecem calculados na captura,
+e são **ignorados**: o `if sum(8) = '1'` tem prioridade sobre os demais ramos. Os três
+segmentos do quarto estágio operam sempre em paralelo, e só o último decide qual resultado
+sobrevive.
+
+**Caso II — deslocamento à esquerda (T5, `E6`):** `leado > 0` e `leado ≤ expb`. É o caso que
+responde ao ponto de observação da Etapa 1 — o circuito conta os zeros e desloca à esquerda,
+descontando o expoente na medida certa.
+
+![Waveform T5 — deslocamento à esquerda](img/wave-t5-caso2.png)
+
+*`+0.54E6 + (−0.55E6)`. As mesmas frações do EG2 e do EG3, agora em `E6`.*
+
+| Estágio | Sinais | Leitura |
+|---|---|---|
+| **1 · ordenar** | `expb=exps=0110`, `fracb=10001101`, `fracs=10001010` | expoentes iguais, `0x8D > 0x8A` |
+| **2 · alinhar** | `exp_diff=0000`, `fraca=10001010` | nada a deslocar |
+| **3 · subtrair** | `sum=000000011` | `0x8D − 0x8A = 3` |
+| **4 · normalizar** | `leado=110` (6), `sum_norm=11000000` | `6 ≤ 6`: o deslocamento **é pago** |
+
+Saída: `exp_out=0000` (`6 − 6`), `frac_out=11000000`, `sign_out=1`, ou seja
+$-(192/256) \times 2^{0} = -0{,}75$ — exato.
+
+Comparando as três capturas do mesmo par de frações:
+
+| Teste | `expb` | `leado` | `sum_norm` | Saída |
+|---|---|---|---|---|
+| EG3 | 0 | 6 | `0xC0` | descartado → zero |
+| EG2 | 3 | 6 | `0xC0` | descartado → zero |
+| **T5** | **6** | 6 | `0xC0` | **aproveitado** → `exp=0`, `frac=0xC0` |
+
+Os estágios 1 a 3 produzem valores idênticos nos três, e o `sum_norm` correto é calculado nos
+três. **A única variável é quanto expoente havia para gastar.**
+
+**Visão geral da simulação completa.** Os onze casos foram exportados do VCD para WaveDrom
+pelo script [`tools/vcd_to_wavedrom.py`](tools/vcd_to_wavedrom.py), que produz um bloco por
+caso mais um panorama contínuo:
+
+| Artefato | Conteúdo |
+|---|---|
+| [`debug/sim_demo.vcd`](debug/sim_demo.vcd) | o dump da simulação exportado do Questa — origem de tudo abaixo |
+| [`img/wavedrom-todos.png`](img/wavedrom-todos.png) | os onze casos em sequência, `EG1` a `T11` |
+| [`debug/wavedrom/ondas.md`](debug/wavedrom/ondas.md) | um bloco WaveDrom por caso, pronto para colar no editor |
+| [`debug/wavedrom/*.json`](debug/wavedrom/) | as fontes individuais (`EG1.json`, …, `T11.json`) |
+
+A conversão é reproduzível:
+
+```bash
+python3 tools/vcd_to_wavedrom.py debug/sim_demo.vcd -o debug/wavedrom
+```
+
+A imagem consolidada tem cerca de 22000 px de largura — abrir em tamanho real, já que
+reduzida à largura da página ela fica ilegível. Para leitura caso a caso, os `.json`
+individuais rendem diagramas na proporção certa.
 
 ### 4.5 Transcript da simulação
 
-> **[placeholder — saída a fornecer]**
-> Colar aqui a saída completa do transcript do Questa após `do sim_demo.do`.
-> Procurar por `[ FALHOU ]` e conferir a linha final.
+Saída completa de `do sim_demo.do`, com os onze casos e o veredito final. O arquivo bruto está
+em [`transcript_questa.txt`](transcript_questa.txt).
 
 ```
-[placeholder — transcript do Questa]
-
 #####################################################################
-  fp_adder_demo -- vista comutada por SW(7)
-  HEX5=C(estouro)  HEX4=apagado  HEX3=sinal  HEX2=exp.  HEX1:HEX0=frac
-  fracao sempre normalizada: frac = '1' & SW(6 downto 0)
+#   fp_adder_demo -- vista comutada por SW(7)
+#   HEX5=C(estouro)  HEX4=apagado  HEX3=sinal  HEX2=exp.  HEX1:HEX0=frac
+#   fracao sempre normalizada: frac = '1' & SW(6 downto 0)
 #####################################################################
-
-=====================================================================
- EG1
----------------------------------------------------------------------
-   op1 = +  exp=3  frac=0x8A   ->        4.312500
-   op2 = -  exp=4  frac=0xDF   ->      -13.937500
-   esperado (real)                      -9.625000
-   HEX5..HEX0 :  _  _  -  4.  9  A
-   lido do display : - exp=4 frac=0x9A  ->       -9.625000
-   erro =      0.000000   tolerancia (2 ULP) =      0.125000
-   [ OK ]
-
-   ... (demais casos) ...
-
+# 
+# ** Warning: NUMERIC_STD.">": metavalue detected, returning FALSE
+#    Time: 0 ns  Iteration: 0  Instance: /fp_adder_demo_tb/dut/fp_add
+# =====================================================================
+#  EG1 : +0.54E3 + (-0.87E4)   alinha 1 casa, subtrai, fica em E4
+# ---------------------------------------------------------------------
+#    op1 = +  exp=3  frac=0x8A   ->        4.312500
+#    op2 = -  exp=4  frac=0xDF   ->      -13.937500
+#    esperado (real)                    -9.625000
+#    HEX5..HEX0 :  _  _  -  4. 9  A  
+#    lido do display : - exp=4 frac=0x9A  ->       -9.625000
+#    erro =      0.000000   tolerancia (2 ULP) =      0.125000
+#    [ OK ]
+# 
+# =====================================================================
+#  EG2 : +0.54E3 + (-0.55E3)   cancelamento: precisa de 6 bits, so ha 3 de expoente
+# ---------------------------------------------------------------------
+#    op1 = +  exp=3  frac=0x8A   ->        4.312500
+#    op2 = -  exp=3  frac=0x8D   ->       -4.406250
+#    esperado (real)                    -0.093750
+#    HEX5..HEX0 :  _  _  -  0. 0  0  
+#    lido do display : - exp=0 frac=0x00  ->       -0.000000
+#    (abaixo do minimo normalizavel: espera-se zero)
+#    [ OK ]
+# 
+# =====================================================================
+#  EG3 : +0.54E0 + (-0.55E0)   expoente no minimo, vira zero negativo
+# ---------------------------------------------------------------------
+#    op1 = +  exp=0  frac=0x8A   ->        0.539062
+#    op2 = -  exp=0  frac=0x8D   ->       -0.550781
+#    esperado (real)                    -0.011719
+#    HEX5..HEX0 :  _  _  -  0. 0  0  
+#    lido do display : - exp=0 frac=0x00  ->       -0.000000
+#    (abaixo do minimo normalizavel: espera-se zero)
+#    [ OK ]
+# 
+# =====================================================================
+#  EG4 : +0.56E3 + (+0.52E3)   vai-um, expoente sobe para E4
+# ---------------------------------------------------------------------
+#    op1 = +  exp=3  frac=0x8F   ->        4.468750
+#    op2 = +  exp=3  frac=0x85   ->        4.156250
+#    esperado (real)                     8.625000
+#    HEX5..HEX0 :  _  _  _  4. 8  A  
+#    lido do display : + exp=4 frac=0x8A  ->        8.625000
+#    erro =      0.000000   tolerancia (2 ULP) =      0.125000
+#    [ OK ]
+# 
+# =====================================================================
+#  T5  : +0.54E6 + (-0.55E6)   expoente suficiente: renormaliza para -0,75
+# ---------------------------------------------------------------------
+#    op1 = +  exp=6  frac=0x8A   ->       34.500000
+#    op2 = -  exp=6  frac=0x8D   ->      -35.250000
+#    esperado (real)                    -0.750000
+#    HEX5..HEX0 :  _  _  -  0. C  0  
+#    lido do display : - exp=0 frac=0xC0  ->       -0.750000
+#    erro =      0.000000   tolerancia (2 ULP) =      0.007812
+#    [ OK ]
+# 
+# =====================================================================
+#  T6  : 1,0 + 0,5             potencias de dois, resultado exato 1,5
+# ---------------------------------------------------------------------
+#    op1 = +  exp=1  frac=0x80   ->        1.000000
+#    op2 = +  exp=0  frac=0x80   ->        0.500000
+#    esperado (real)                     1.500000
+#    HEX5..HEX0 :  _  _  _  1. C  0  
+#    lido do display : + exp=1 frac=0xC0  ->        1.500000
+#    erro =      0.000000   tolerancia (2 ULP) =      0.015625
+#    [ OK ]
+# 
+# =====================================================================
+#  T7  : -24 + 4               operando 1 e o maior, subtrai e mantem o sinal
+# ---------------------------------------------------------------------
+#    op1 = -  exp=5  frac=0xC0   ->      -24.000000
+#    op2 = +  exp=3  frac=0x80   ->        4.000000
+#    esperado (real)                   -20.000000
+#    HEX5..HEX0 :  _  _  -  5. A  0  
+#    lido do display : - exp=5 frac=0xA0  ->      -20.000000
+#    erro =      0.000000   tolerancia (2 ULP) =      0.250000
+#    [ OK ]
+# 
+# =====================================================================
+#  T8  : 16384 + 0,996         exp_diff=15, o operando pequeno e absorvido
+# ---------------------------------------------------------------------
+#    op1 = +  exp=15  frac=0x80   ->    16384.000000
+#    op2 = +  exp=0  frac=0xFF   ->        0.996094
+#    esperado (real)                 16384.996094
+#    HEX5..HEX0 :  _  _  _  F. 8  0  
+#    lido do display : + exp=15 frac=0x80  ->    16384.000000
+#    erro =      0.996094   tolerancia (2 ULP) =    256.000000
+#    [ OK ]
+# 
+# =====================================================================
+#  T9  : a + (-a) com exp=12   cancelamento total: zero com expoente 5
+# ---------------------------------------------------------------------
+#    op1 = +  exp=12  frac=0xC0   ->     3072.000000
+#    op2 = -  exp=12  frac=0xC0   ->    -3072.000000
+#    esperado (real)                     0.000000
+#    HEX5..HEX0 :  _  _  -  5. 0  0  
+#    lido do display : - exp=5 frac=0x00  ->       -0.000000
+#    (abaixo do minimo normalizavel: espera-se zero)
+#    [ OK ]
+# 
+# =====================================================================
+#  T10 : 32640 + 32640         ESTOURO do expoente, HEX5 mostra C
+# ---------------------------------------------------------------------
+#    op1 = +  exp=15  frac=0xFF   ->    32640.000000
+#    op2 = +  exp=15  frac=0xFF   ->    32640.000000
+#    esperado (real)                 65280.000000
+#    HEX5..HEX0 :  C  _  _  0. F  F  
+#    lido do display : + exp=16 (C aceso: 0+16) frac=0xFF  ->    65280.000000
+#    erro =      0.000000   tolerancia (2 ULP) =    512.000000
+#    [ OK ]
+# 
+# =====================================================================
+#  T11 : KEY1 reinicia os dois operandos em +1,0
+# ---------------------------------------------------------------------
+#    esperado (real)                     2.000000
+#    HEX5..HEX0 :  _  _  _  2. 8  0  
+#    lido do display : + exp=2 frac=0x80  ->        2.000000
+#    erro =      0.000000   tolerancia (2 ULP) =      0.031250
+#    [ OK ]
+# 
 #####################################################################
-  RESULTADO: todos os testes passaram.
+#   RESULTADO: todos os testes passaram.
 #####################################################################
 ```
 
-*(O bloco acima reproduz o formato do transcript; os valores devem ser substituídos pela
-saída real da execução.)*
-
-### 4.6 Relatório de compilação do Quartus
-
-> **[placeholder — imagens/dados a fornecer]**
-> Após *Processing → Start Compilation*, capturar o **Flow Summary**.
-
-![Flow Summary do Quartus](placeholder-quartus-flow-summary.png)
-
-`[placeholder]` — registrar: elementos lógicos utilizados, registradores, pinos, e confirmar
-`Total registers = 26` (6 registradores: 2 sinais + 2 × 4 bits de expoente + 2 × 8 bits de
-fração).
-
-![RTL Viewer — hierarquia do fp_adder_demo](placeholder-quartus-rtl-viewer.png)
-
-`[placeholder]` — *Tools → Netlist Viewers → RTL Viewer*, útil para mostrar a instância do
-`fp_adder` e os três `hex_to_sseg`.
+O warning `NUMERIC_STD.">": metavalue detected` em `t = 0` é esperado e inofensivo: `leado`
+ainda vale `UUU` no primeiro delta, antes de qualquer estímulo chegar ao circuito.
 
 ---
 
-### 4.7 Código VHDL Final
+### 4.6 Código VHDL Final
 
-#### 4.7.1 `fp_adder.vhd` — o somador (Listing 3.19, **não modificado**)
+Os arquivos são a fonte da verdade e estão versionados no repositório:
 
-Reproduzido aqui por completude; a única diferença em relação ao livro é formatação.
+| Arquivo | Papel | Estado |
+|---|---|---|
+| [`fp_adder/fp_adder.vhd`](fp_adder/fp_adder.vhd) | somador de 4 estágios — Listing 3.19 do livro | **não modificado** (só indentação e comentários de seção) |
+| [`fp_adder/hex_to_sseg.vhd`](fp_adder/hex_to_sseg.vhd) | decodificador de sete segmentos | reaproveitado do Lab 3; a codificação da DE10-Lite coincide com a do livro |
+| [`fp_adder/fp_adder_demo.vhd`](fp_adder/fp_adder_demo.vhd) | **entidade topo — a adaptação** | reescrito para a DE10-Lite |
+| [`fp_adder/fp_adder_demo_tb.vhd`](fp_adder/fp_adder_demo_tb.vhd) | testbench, 11 casos | novo |
+| [`fp_adder/sim_demo.do`](fp_adder/sim_demo.do) | script de simulação do Questa | novo |
 
-```vhdl
--- Based on the book: FPGA Prototyping by VHDL Examples: Xilinx Spartan-3 Version
--- Pong P. Chu, 2007
+Todo o trabalho de adaptação vive no `fp_adder_demo.vhd`; os quatro trechos que o resumem
+estão destacados a seguir.
 
-library ieee;
-use ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
+#### 4.6.1 Trechos-chave da adaptação
 
-entity fp_adder is
-    port (
-        sign1, sign2 : in  std_logic;
-        exp1, exp2   : in  std_logic_vector(3 downto 0);
-        frac1, frac2 : in  std_logic_vector(7 downto 0);
-
-        sign_out : out std_logic;
-        exp_out  : out std_logic_vector(3 downto 0);
-        frac_out : out std_logic_vector(7 downto 0)
-    );
-end fp_adder;
-
-architecture arch of fp_adder is
-
-    -- suffix b, s, a, n for
-    -- big, small, aligned, normalized number
-
-    signal signb, signs : std_logic;
-    signal expb, exps, expn : unsigned(3 downto 0);
-    signal fracb, fracs, fraca, fracn : unsigned(7 downto 0);
-    signal sum_norm : unsigned(7 downto 0);
-    signal exp_diff : unsigned(3 downto 0);
-    signal sum : unsigned(8 downto 0); -- one extra for carry
-    signal leado : unsigned(2 downto 0);
-
-begin
-
-    -------------------------------------------------------------------------
-    -- 1st stage: sort to find the larger number
-    -------------------------------------------------------------------------
-    process(sign1, sign2, exp1, exp2, frac1, frac2)
-    begin
-        if (exp1 & frac1) > (exp2 & frac2) then
-            signb <= sign1;
-            signs <= sign2;
-            expb  <= unsigned(exp1);
-            exps  <= unsigned(exp2);
-            fracb <= unsigned(frac1);
-            fracs <= unsigned(frac2);
-        else
-            signb <= sign2;
-            signs <= sign1;
-            expb  <= unsigned(exp2);
-            exps  <= unsigned(exp1);
-            fracb <= unsigned(frac2);
-            fracs <= unsigned(frac1);
-        end if;
-    end process;
-
-    -------------------------------------------------------------------------
-    -- 2nd stage: align smaller number
-    -------------------------------------------------------------------------
-    exp_diff <= expb - exps;
-
-    with exp_diff select
-        fraca <=
-            fracs                  when "0000",
-            "0"       & fracs(7 downto 1) when "0001",
-            "00"      & fracs(7 downto 2) when "0010",
-            "000"     & fracs(7 downto 3) when "0011",
-            "0000"    & fracs(7 downto 4) when "0100",
-            "00000"   & fracs(7 downto 5) when "0101",
-            "000000"  & fracs(7 downto 6) when "0110",
-            "0000000" & fracs(7)          when "0111",
-            "00000000"                  when others;
-
-    -------------------------------------------------------------------------
-    -- 3rd stage: add / subtract
-    -------------------------------------------------------------------------
-    sum <=
-        ('0' & fracb) + ('0' & fraca) when signb = signs else
-        ('0' & fracb) - ('0' & fraca);
-
-    -------------------------------------------------------------------------
-    -- 4th stage: normalize
-    -------------------------------------------------------------------------
-
-    -- Count leading zeros
-    leado <=
-        "000" when (sum(7) = '1') else
-        "001" when (sum(6) = '1') else
-        "010" when (sum(5) = '1') else
-        "011" when (sum(4) = '1') else
-        "100" when (sum(3) = '1') else
-        "101" when (sum(2) = '1') else
-        "110" when (sum(1) = '1') else
-        "111";
-
-    -- Shift significand according to leading zeros
-    with leado select
-        sum_norm <=
-            sum(7 downto 0)         when "000",
-            sum(6 downto 0) & '0'   when "001",
-            sum(5 downto 0) & "00"  when "010",
-            sum(4 downto 0) & "000" when "011",
-            sum(3 downto 0) & "0000" when "100",
-            sum(2 downto 0) & "00000" when "101",
-            sum(1 downto 0) & "000000" when "110",
-            sum(0) & "0000000" when others;
-
-    -- Normalize with special conditions
-    process(sum, sum_norm, expb, leado)
-    begin
-        if sum(8) = '1' then
-            expn  <= expb + 1;
-            -- Carry out: shift fraction right
-            fracn <= sum(8 downto 1);
-
-        elsif leado > expb then
-            -- Too small to normalize: set to zero
-            expn  <= (others => '0');
-            fracn <= (others => '0');
-
-        else
-            expn  <= expb - leado;
-            fracn <= sum_norm;
-        end if;
-    end process;
-
-    -------------------------------------------------------------------------
-    -- Output
-    -------------------------------------------------------------------------
-    sign_out <= signb;
-    exp_out  <= std_logic_vector(expn);
-    frac_out <= std_logic_vector(fracn);
-
-end arch;
-```
-
-#### 4.7.2 `hex_to_sseg.vhd` — decodificador de sete segmentos
-
-Reaproveitado do Capítulo 4 do livro. A codificação de segmentos da DE10-Lite coincide com a
-da S3 (ativo-baixo, ordem `gfedcba`), então **nenhuma mudança foi necessária** — mas isso só
-ficou claro depois de conferir o manual da placa (ver §5.2).
-
-```vhdl
-library ieee;
-use ieee.std_logic_1164.all;
-
-entity hex_to_sseg is
-    port(
-        hex  : in  std_logic_vector(3 downto 0);
-        dp   : in  std_logic;
-        sseg : out std_logic_vector(7 downto 0)
-    );
-end hex_to_sseg;
-
-
-architecture arch of hex_to_sseg is
-begin
-
-    with hex select
-        sseg(6 downto 0) <=
-
-        -- gfedcba
-        "1000000" when "0000", -- 0
-        "1111001" when "0001", -- 1
-        "0100100" when "0010", -- 2
-        "0110000" when "0011", -- 3
-        "0011001" when "0100", -- 4
-        "0010010" when "0101", -- 5
-        "0000010" when "0110", -- 6
-        "1111000" when "0111", -- 7
-        "0000000" when "1000", -- 8
-        "0010000" when "1001", -- 9
-        "0001000" when "1010", -- A
-        "0000011" when "1011", -- b
-        "0100111" when "1100", -- C
-        "0100001" when "1101", -- d
-        "0000110" when "1110", -- E
-        "0001110" when others; -- F
-
-
-    -- ponto decimal
-    sseg(7) <= not dp;
-
-end arch;
-```
-
-#### 4.7.3 `fp_adder_demo.vhd` — **a adaptação** (entidade topo)
-
-Este é o arquivo onde vive todo o trabalho de adaptação. Os trechos de maior relevância estão
-destacados abaixo do código completo.
-
-```vhdl
-library ieee;
-use ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
-
-
-------------------------------------------------------------------------
--- fp_adder_demo  --  DE10-Lite
---
--- ENTRADA
---
---     SW(9 downto 8) = campo        SW(6 downto 0) = dado
---
---        "00"  ->  sinal e expoente do operando 1
---        "01"  ->  fracao do operando 1
---        "10"  ->  sinal e expoente do operando 2
---        "11"  ->  fracao do operando 2
---
---     Nos campos de sinal/expoente:  SW(4) = sinal,  SW(3 downto 0) = exp
---     Nos campos de fracao:          frac = '1' & SW(6 downto 0)
---
---     A fracao e SEMPRE normalizada: o bit 7 nao e ajustavel, e nao
---     existe mais como digitar um operando fora do formato.
---
---     KEY0 = carrega o campo selecionado
---     KEY1 = reinicia os dois operandos em +1,0  (autoteste: mostra 2,0)
---
---
--- VISTA
---
---     SW(7) = '0'  ->  mostra o OPERANDO apontado por SW(9)
---     SW(7) = '1'  ->  mostra o RESULTADO
---
---
--- DISPLAYS
---
---     HEX5   "C" quando o expoente do resultado estourou
---     HEX4   apagado (separador visual)
---     HEX3   "-" quando o numero mostrado e negativo
---     HEX2   expoente, com o ponto decimal SEMPRE aceso
---     HEX1   fracao, nibble alto
---     HEX0   fracao, nibble baixo
---
---     O ponto aceso em HEX2 marca a fronteira entre expoente e fracao:
---
---          C _ -  2.  F  F      ->  -(0xFF/256) * 2^(2+16)
---          _ _ _  5.  8  0      ->   (0x80/256) * 2^5
---
---
--- SOBRE O "C" DO HEX5
---
---     Ele NAO mostra sum(8), o vai-um da soma de 9 bits. Aquele bit
---     acende em quase toda soma de sinais iguais -- e situacao normal,
---     nao merece aviso.
---
---     O "C" aqui marca o estouro do EXPOENTE: o expoente verdadeiro
---     seria 16, que nao cabe nos 4 bits do campo e da a volta para 0.
---     Ou seja, com o "C" aceso, o expoente correto e o que aparece
---     em HEX2 MAIS 16. O display continua legivel em vez de virar
---     apenas um alarme.
-------------------------------------------------------------------------
-
-entity fp_adder_demo is
-    port(
-        MAX10_CLK1_50 : in std_logic;
-
-        KEY : in std_logic_vector(1 downto 0);
-        SW  : in std_logic_vector(9 downto 0);
-
-        LEDR : out std_logic_vector(9 downto 0);
-
-        HEX0 : out std_logic_vector(7 downto 0);
-        HEX1 : out std_logic_vector(7 downto 0);
-        HEX2 : out std_logic_vector(7 downto 0);
-        HEX3 : out std_logic_vector(7 downto 0);
-        HEX4 : out std_logic_vector(7 downto 0);
-        HEX5 : out std_logic_vector(7 downto 0)
-    );
-end fp_adder_demo;
-
-
-architecture arch of fp_adder_demo is
-
-
-    --------------------------------------------------------------------
-    -- padroes de segmento montados a mao
-    --
-    -- O hex_to_sseg so sabe gerar 0 a F. Traco e apagado nao estao na
-    -- tabela dele, e isso e uma vantagem: nenhum resultado legitimo
-    -- consegue imitar esses dois padroes.
-    --
-    --                                       dp gfedcba
-    --------------------------------------------------------------------
-
-    constant SSEG_APAGADO : std_logic_vector(7 downto 0) := "1" & "1111111";
-    constant SSEG_MENOS   : std_logic_vector(7 downto 0) := "1" & "0111111";
-    constant SSEG_C       : std_logic_vector(7 downto 0) := "1" & "0100111";
-
-
-    -- valor de reinicio: +1,0  =  (0x80 / 256) * 2^1
-
-    constant EXP_UM  : std_logic_vector(3 downto 0) := "0001";
-    constant FRAC_UM : std_logic_vector(7 downto 0) := "10000000";
-
-
-    -- operandos armazenados
-
-    signal sign1_reg : std_logic                    := '0';
-    signal exp1_reg  : std_logic_vector(3 downto 0) := EXP_UM;
-    signal frac1_reg : std_logic_vector(7 downto 0) := FRAC_UM;
-
-    signal sign2_reg : std_logic                    := '0';
-    signal exp2_reg  : std_logic_vector(3 downto 0) := EXP_UM;
-    signal frac2_reg : std_logic_vector(7 downto 0) := FRAC_UM;
-
-
-    -- fracao vinda das chaves, sempre normalizada
-
-    signal frac_in : std_logic_vector(7 downto 0);
-
-
-    -- saida do adder
-
-    signal sign_out : std_logic;
-    signal exp_out  : std_logic_vector(3 downto 0);
-    signal frac_out : std_logic_vector(7 downto 0);
-
-    signal ovf : std_logic;
-
-
-    -- operando apontado por SW(9)
-
-    signal op_sign : std_logic;
-    signal op_exp  : std_logic_vector(3 downto 0);
-    signal op_frac : std_logic_vector(7 downto 0);
-
-
-    -- o que vai para os displays
-
-    signal ver_sign : std_logic;
-    signal ver_exp  : std_logic_vector(3 downto 0);
-    signal ver_frac : std_logic_vector(7 downto 0);
-
-
-begin
-
-
-    ------------------------------------------------------------------
-    -- Fracao das chaves: bit escondido garantido em '1'
-    ------------------------------------------------------------------
-
-    frac_in <= '1' & SW(6 downto 0);
-
-
-    ------------------------------------------------------------------
-    -- Captura dos campos
-    ------------------------------------------------------------------
-
-    process(MAX10_CLK1_50)
-    begin
-
-        if rising_edge(MAX10_CLK1_50) then
-
-
-            -- KEY0: carrega o campo apontado por SW(9 downto 8)
-
-            if KEY(0) = '0' then
-
-                case SW(9 downto 8) is
-
-                    when "00" =>
-                        sign1_reg <= SW(4);
-                        exp1_reg  <= SW(3 downto 0);
-
-                    when "01" =>
-                        frac1_reg <= frac_in;
-
-                    when "10" =>
-                        sign2_reg <= SW(4);
-                        exp2_reg  <= SW(3 downto 0);
-
-                    when others =>
-                        frac2_reg <= frac_in;
-
-                end case;
-
-            end if;
-
-
-            -- KEY1: reinicia os dois operandos em +1,0
-
-            if KEY(1) = '0' then
-
-                sign1_reg <= '0';
-                exp1_reg  <= EXP_UM;
-                frac1_reg <= FRAC_UM;
-
-                sign2_reg <= '0';
-                exp2_reg  <= EXP_UM;
-                frac2_reg <= FRAC_UM;
-
-            end if;
-
-
-        end if;
-
-    end process;
-
-
-    ------------------------------------------------------------------
-    -- Somador FP
-    ------------------------------------------------------------------
-
-    fp_add : entity work.fp_adder
-
-        port map(
-
-            sign1 => sign1_reg,
-            sign2 => sign2_reg,
-
-            exp1 => exp1_reg,
-            exp2 => exp2_reg,
-
-            frac1 => frac1_reg,
-            frac2 => frac2_reg,
-
-            sign_out => sign_out,
-            exp_out  => exp_out,
-            frac_out => frac_out
-
-        );
-
-
-    ------------------------------------------------------------------
-    -- Estouro do expoente, deduzido de fora do somador
-    --
-    -- Com sinais iguais nao ha subtracao, entao exp_out so pode valer
-    -- expb ou expb+1. Se expb = 15, o incremento da a volta e exp_out
-    -- sai 0 -- resultado impossivel por qualquer outro caminho quando
-    -- expb = 15, porque o ramo de normalizacao faz expb - leado, que
-    -- com leado no maximo 7 nunca desce abaixo de 8.
-    --
-    -- expb = 15 equivale a algum dos dois expoentes ser 15, ja que a
-    -- chave de ordenacao coloca o maior expoente em expb.
-    ------------------------------------------------------------------
-
-    ovf <= '1' when sign1_reg = sign2_reg
-                    and (exp1_reg = "1111" or exp2_reg = "1111")
-                    and exp_out = "0000"
-           else '0';
-
-
-    ------------------------------------------------------------------
-    -- Vista: SW(9) escolhe o operando, SW(7) escolhe operando/resultado
-    ------------------------------------------------------------------
-
-    op_sign <= sign1_reg when SW(9) = '0' else sign2_reg;
-    op_exp  <= exp1_reg  when SW(9) = '0' else exp2_reg;
-    op_frac <= frac1_reg when SW(9) = '0' else frac2_reg;
-
-    ver_sign <= sign_out when SW(7) = '1' else op_sign;
-    ver_exp  <= exp_out  when SW(7) = '1' else op_exp;
-    ver_frac <= frac_out when SW(7) = '1' else op_frac;
-
-
-    ------------------------------------------------------------------
-    -- LEDs
-    ------------------------------------------------------------------
-
-    LEDR(6 downto 0) <= SW(6 downto 0);   -- eco do dado nas chaves
-
-    LEDR(7) <= SW(7);                     -- vista: aceso = resultado
-
-    LEDR(8) <= ovf;                       -- estouro (mesmo na vista do operando)
-
-    LEDR(9) <= sign_out;                  -- sinal do resultado
-
-
-    ------------------------------------------------------------------
-    -- Displays montados a mao
-    ------------------------------------------------------------------
-
-    -- so acende na vista do resultado: operando nenhum tem carry
-    HEX5 <= SSEG_C when (SW(7) = '1' and ovf = '1') else SSEG_APAGADO;
-
-    HEX4 <= SSEG_APAGADO;
-
-    HEX3 <= SSEG_MENOS when ver_sign = '1' else SSEG_APAGADO;
-
-
-    ------------------------------------------------------------------
-    -- Displays decodificados
-    ------------------------------------------------------------------
-
-    HEX2_UNIT : entity work.hex_to_sseg
-        port map(
-            hex  => ver_exp,
-            dp   => '1',            -- sempre aceso: separa expoente de fracao
-            sseg => HEX2
-        );
-
-    HEX1_UNIT : entity work.hex_to_sseg
-        port map(
-            hex  => ver_frac(7 downto 4),
-            dp   => '0',
-            sseg => HEX1
-        );
-
-    HEX0_UNIT : entity work.hex_to_sseg
-        port map(
-            hex  => ver_frac(3 downto 0),
-            dp   => '0',
-            sseg => HEX0
-        );
-
-
-end arch;
-```
-
-#### 4.7.4 Trechos-chave da adaptação
-
-Os quatro pontos abaixo são **a substância da adaptação** — tudo o mais é fiação.
-
-**(A) Bit escondido — normalização garantida por construção** *(§3.5)*
+**(A) Normalização da entrada** *(§3.5)*
 
 ```vhdl
 frac_in <= '1' & SW(6 downto 0);
@@ -1181,7 +897,7 @@ Escolhidos por serem **inimitáveis** por qualquer valor válido — sinalizaç�
 
 *Etapa 3*
 
-### 4.8 Funcionamento na Placa
+### 4.7 Funcionamento na Placa
 
 #### Procedimento de gravação
 
@@ -1192,70 +908,103 @@ Escolhidos por serem **inimitáveis** por qualquer valor válido — sinalizaç�
 4. *Processing → Start Compilation*.
 5. *Tools → Programmer* → USB-Blaster → carregar `output_files/fp_adder.sof` → *Start*.
 
-#### Sequência de operação (exemplo: `1,0 + 0,5 = 1,5`)
+#### Estado inicial
 
-| Passo | `SW(9:8)` | `SW(6:0)` | Ação | Efeito |
+Logo após a gravação, ambos os operandos valem `+1,0` e os displays mostram o resultado da
+soma de reinício:
+
+![Placa recém-gravada, mostrando 1.80](img/placa/placa_default.png)
+
+`_ _ _ 1. 8 0` — expoente 1, fração `0x80`. Todas as chaves em repouso.
+
+#### Casos demonstrados
+
+Na bancada exercitamos **dois casos**, escolhidos por cobrirem os dois extremos do
+comportamento: uma soma comum, com alinhamento e sem vai-um, e o estouro do expoente, que é o
+único ponto em que o formato de saída não fecha.
+
+O vídeo completo da demonstração está em
+<https://www.youtube.com/watch?v=FCv_n_XdVJw>.
+
+---
+
+**Caso 1 — estouro do expoente: `−32640 + (−32640) = −65280`**
+
+Os dois operandos no extremo negativo da faixa: sinal negativo, expoente `F`, fração `0xFF`.
+
+| Passo | `SW(9:8)` | `SW(6:0)` | Ação | Campo carregado |
 |---|---|---|---|---|
-| 1 | `00` | `0000001` | `KEY0` | op1: sinal `+`, expoente 1 |
-| 2 | `01` | `0000000` | `KEY0` | op1: `frac = 0x80` → **1,0** |
-| 3 | `10` | `0000000` | `KEY0` | op2: sinal `+`, expoente 0 |
-| 4 | `11` | `0000000` | `KEY0` | op2: `frac = 0x80` → **0,5** |
-| 5 | — | — | `SW(7) = 1` | mostra `_ _ _ 1. C 0` → **1,5** |
+| 1 | `00` | `0011111` | `KEY0` | op1: sinal `−`, expoente 15 |
+| 2 | `01` | `1111111` | `KEY0` | op1: fração `0xFF` |
+| 3 | `10` | `0011111` | `KEY0` | op2: sinal `−`, expoente 15 |
+| 4 | `11` | `1111111` | `KEY0` | op2: fração `0xFF` |
+| 5 | — | — | `SW(7) = 1` | mostra o resultado |
 
-Lembrete: nos campos de sinal/expoente, `SW(4)` é o bit de sinal e `SW(3:0)` o expoente;
-`SW(6:5)` são ignorados.
+<table>
+<tr>
+<td width="50%"><img src="img/placa/caso_01_OP01_expoente.png" alt="op1 sinal e expoente"></td>
+<td width="50%"><img src="img/placa/caso_01_OP01_fracao.png" alt="op1 fracao"></td>
+</tr>
+<tr>
+<td><b>Passo 1</b> — <code>- F. 8 0</code><br>sinal e expoente do op1 carregados; a fração ainda é a de reinício</td>
+<td><b>Passo 2</b> — <code>- F. F F</code><br>op1 completo: <b>−32640</b></td>
+</tr>
+<tr>
+<td><img src="img/placa/caso_01_OP02_expoente.png" alt="op2 sinal e expoente"></td>
+<td><img src="img/placa/caso_01_OP02_fracao.png" alt="op2 fracao"></td>
+</tr>
+<tr>
+<td><b>Passo 3</b> — <code>- F. 8 0</code><br>agora o display segue o op2, porque <code>SW(9) = 1</code></td>
+<td><b>Passo 4</b> — <code>- F. F F</code><br>op2 completo: <b>−32640</b></td>
+</tr>
+</table>
 
-#### Casos demonstrados na placa
+![Resultado do caso 1: C aceso, -65280](img/placa/caso_01_resultado.png)
 
-> **[placeholder — fotografias a fornecer]**
-> Fotografar a placa com os displays legíveis, um registro por caso. Sugestão: enquadrar
-> chaves + displays na mesma foto para que a entrada seja verificável na imagem.
+**Passo 5 — `C _ - 0. F F`.** O `C` no `HEX5` indica que o expoente estourou; `LEDR8` acende
+junto. Com sinais iguais, `sum = 0xFF + 0xFF = 0x1FE` dispara o vai-um, então
+`expn = 15 + 1 = 16` — que não cabe em 4 bits e sai como `0000`, enquanto a fração fica
+`sum(8 downto 1) = 0xFF`. Com o `C` aceso o expoente real é 16, e a leitura é
+$-(255/256) \times 2^{16} = -65280$.
 
-**Caso 1 — Autoteste (`KEY1`): `+1,0 + 1,0 = 2,0`**
-Displays esperados: `_ _ _ 2. 8 0`
+É o mesmo mecanismo do **T10** da simulação (§4.3), aqui com os dois operandos negativos —
+o `sign_out` acompanha o maior, e `LEDR9` acende.
 
-![Placa — autoteste KEY1](placeholder-placa-caso1-autoteste.jpg)
+---
 
-`[placeholder]`
+**Caso 2 — soma com alinhamento: `2,5 + 1,0 = 3,5`**
 
-**Caso 2 — Normalização com deslocamento à esquerda (caso II)**
-Sugestão: `+0.54E6 + (−0.55E6)`, isto é `exp=6 frac=0x8A` e `exp=6 frac=0x8D` negativo.
-Displays esperados: `_ _ - 0. C 0` → `−0,75`
+| Passo | `SW(9:8)` | `SW(6:0)` | Ação | Campo carregado |
+|---|---|---|---|---|
+| 1 | `00` | `0000010` | `KEY0` | op1: sinal `+`, expoente 2 |
+| 2 | `01` | `0100000` | `KEY0` | op1: fração `0xA0` |
+| 3 | `10` / `11` | — | — | op2 mantido no valor de reinício `+1,0` |
+| 4 | — | — | `SW(7) = 1` | mostra o resultado |
 
-![Placa — deslocamento à esquerda](placeholder-placa-caso2-normalizacao.jpg)
+<table>
+<tr>
+<td width="50%"><img src="img/placa/caso_02_OP01_expoente.png" alt="op1 sinal e expoente"></td>
+<td width="50%"><img src="img/placa/caso_02_OP01_fracao.png" alt="op1 fracao"></td>
+</tr>
+<tr>
+<td><b>Passo 1</b> — <code>_ _ _ 2. 8 0</code><br>expoente 2, positivo</td>
+<td><b>Passo 2</b> — <code>_ _ _ 2. A 0</code><br>op1 completo: <b>2,5</b></td>
+</tr>
+<tr>
+<td><img src="img/placa/caso_02_OP02_expoente.png" alt="op2 sinal e expoente"></td>
+<td><img src="img/placa/caso_02_OP02_fracao.png" alt="op2 fracao"></td>
+</tr>
+<tr>
+<td colspan="2"><b>Passo 3</b> — <code>_ _ _ 1. 8 0</code> nas duas vistas: o operando 2 permanece em <b>+1,0</b>, o valor de reinício. As fotos conferem os dois campos antes de somar.</td>
+</tr>
+</table>
 
-`[placeholder]`
+![Resultado do caso 2: 3,5](img/placa/caso_02_resultado.png)
 
-**Caso 3 — Vai-um / carry out (caso IV, EG4)**
-`+0.56E3 + (+0.52E3)`: `exp=3 frac=0x8F` e `exp=3 frac=0x85`.
-Displays esperados: `_ _ _ 4. 8 A` → `8,625`
-
-![Placa — carry out](placeholder-placa-caso3-carry.jpg)
-
-`[placeholder]`
-
-**Caso 4 — Estouro do expoente, indicador `C`**
-`32640 + 32640`: ambos com `exp=15 frac=0xFF`.
-Displays esperados: `C _ _ 0. F F` → expoente real `0 + 16 = 16` → **65280**.
-`LEDR(8)` deve estar aceso.
-
-![Placa — estouro do expoente com indicador C](placeholder-placa-caso4-estouro.jpg)
-
-`[placeholder]`
-
-**Caso 5 — Resultado pequeno demais vira zero (caso III, EG3)**
-`+0.54E0 + (−0.55E0)`: `exp=0 frac=0x8A` e `exp=0 frac=0x8D` negativo.
-Displays esperados: `_ _ - 0. 0 0` — zero com o sinal negativo preservado, exatamente o
-`−0.00E0` da Table 1 do livro.
-
-![Placa — underflow para zero](placeholder-placa-caso5-zero.jpg)
-
-`[placeholder]`
-
-#### Vídeo (opcional)
-
-> **[placeholder]** — link para vídeo curto demonstrando a sequência de carga dos quatro
-> campos e a leitura do resultado.
+**Passo 4 — `_ _ _ 2. E 0`.** Percorrendo os estágios: a ordenação elege o op1 como maior
+(`expb = 2`), o alinhamento desloca `0x80` uma casa à direita virando `0x40`, a soma dá
+`0xA0 + 0x40 = 0xE0` sem estourar os 8 bits, e a normalização não tem o que fazer
+(`leado = 0`). Leitura: $(224/256) \times 2^{2} = 3{,}5$ — exato.
 
 ---
 
@@ -1263,16 +1012,17 @@ Displays esperados: `_ _ - 0. 0 0` — zero com o sinal negativo preservado, exa
 
 ## 5. Diário de Bordo de IA
 
-Utilizamos **ChatGPT** (formatação inicial, primeira versão do wrapper de placa e depuração
-no Quartus) e **Claude** (testbench auto-verificável, script de simulação, análise de casos de
-borda e ferramentas de depuração). Os registros completos das conversas estão em
-[`resources/`](resources/):
+Usamos duas ferramentas, em fases distintas do trabalho:
 
-| Arquivo | Ferramenta | Assunto |
-|---|---|---|
-| [`resources/chat_gpt_01.txt`](resources/chat_gpt_01.txt) | ChatGPT | formatação do VHDL extraído do PDF; busca pelos módulos auxiliares |
-| [`resources/chat_gpt_02.txt`](resources/chat_gpt_02.txt) | ChatGPT | criação do projeto no Quartus, pinagem, primeira versão do `fp_adder_demo` |
-| [`resources/claude_03.md`](resources/claude_03.md) | Claude | testbench, `sim_demo.do`, protocolo de campo, indicador `C`, análise de casos de borda |
+| Ferramenta | Onde atuou |
+|---|---|
+| **ChatGPT** | transcrição e formatação do VHDL do PDF; criação do projeto no Quartus e pinagem; primeira versão do wrapper `fp_adder_demo`; depuração dos displays na placa |
+| **Claude** | testbench e `sim_demo.do`; protocolo de entrada por campo; indicador `C` de estouro; análise de casos de borda; ferramentas de depuração em HTML |
+
+Foram três conversas ao todo — duas com ChatGPT, uma longa com Claude. **Esta seção reproduz
+os prompts que efetivamente mudaram o projeto, os erros cometidos pelas ferramentas e as
+correções que aplicamos**, de modo que a auditoria possa ser feita sem consultar os
+registros originais.
 
 Artefatos de depuração gerados com IA e mantidos em [`debug/`](debug/):
 
@@ -1281,15 +1031,42 @@ Artefatos de depuração gerados com IA e mantidos em [`debug/`](debug/):
 | [`debug/fp_adder_debug.html`](debug/fp_adder_debug.html) | calculadora bit a bit do formato + conversor decimal → sequência de chaves |
 | [`debug/de10_wave_player.html`](debug/de10_wave_player.html) | reprodutor de VCD exportado do Questa, desenhando a placa animada com linha do tempo |
 
-Ambos são **ferramentas de apoio**, não fazem parte do hardware entregue. O
-`fp_adder_debug.html` foi particularmente útil para gerar valores esperados antes de rodar a
-simulação; o `de10_wave_player.html` permitiu revisar a operação da placa a partir do VCD sem
-precisar decorar padrões de sete segmentos.
+Ambos são **ferramentas de apoio**, não fazem parte do hardware entregue nem influenciam a
+síntese. São páginas HTML autocontidas: basta abrir no navegador.
+
+**`fp_adder_debug.html` — calculadora e conversor.** Recebe sinal, expoente e fração e mostra
+a soma passo a passo pelos quatro estágios, com os valores intermediários que aparecem na
+waveform. No sentido inverso, recebe um decimal e devolve a sequência de chaves e botões para
+digitá-lo na placa, informando se o valor é exato, aproximado ou fora de faixa. Foi com ele
+que geramos os valores esperados antes de rodar a simulação.
+
+![fp_adder_debug.html em uso](img/debug-fp-adder-debug.png)
+
+*Conversão de `70.5`: a página devolve `(0x8D / 256) × 2⁷`, classifica como **exato** e lista
+os quatro passos de chaves. Abaixo, os painéis dos operandos bit a bit, a réplica dos displays
+com o valor decimal, e o detalhamento estágio por estágio.*
+
+**`de10_wave_player.html` — reprodutor de VCD.** Lê um VCD exportado do Questa
+(o do nosso testbench está em [`debug/sim_demo.vcd`](debug/sim_demo.vcd)) e desenha a
+DE10-Lite animada, com chaves, LEDs e os seis displays, mais uma linha do tempo por onde se
+avança e retrocede na simulação. Um painel lateral mostra o valor decimal do que está no
+display. Permitiu revisar a operação da placa sem precisar decorar padrões de sete segmentos.
+
+![de10_wave_player.html em uso](img/debug-de10-wave-player.png)
+
+*Reprodução de `debug/sim_demo.vcd` no instante 330 ns (evento 10 de 147). Os displays mostram
+`- 4. 8 0`, que o painel traduz para `−(0x80 / 256) × 2⁴ = −8`. Abaixo, a linha do tempo e a
+tabela de mapeamento, que permite apontar outros nomes de sinal caso o VCD venha de um
+testbench diferente.*
+
+O uso do reprodutor está demonstrado em
+[`img/de10-wave-player-uso.mp4`](img/de10-wave-player-uso.mp4): carregamento do VCD, navegação
+pela linha do tempo e leitura dos displays acompanhando a simulação.
 
 ### 5.1 Prompts utilizados (seleção)
 
-Reproduzimos abaixo os prompts que mais influenciaram o resultado final. A lista completa
-está nos arquivos de `resources/`.
+Abaixo, transcritos literalmente, os prompts que mudaram o rumo do projeto. Cada um está
+seguido do que produziu.
 
 > **[ChatGPT #1]** "Formate corretamente estes arquivos VHDL" *(seguido do texto colado
 > diretamente do PDF do livro)*
@@ -1389,19 +1166,19 @@ fração mais próxima." Traduzir `0.54 → 0x8A`, `0.87 → 0xDF` etc. preserva
 rastreabilidade com o livro, o que a busca estrutural destruía.
 
 **(8) Divergência entre o registro da conversa e o estado real dos arquivos.**
-O log em `resources/claude_03.md` afirma que o testbench tem "19 casos" e "~600 linhas", e
-menciona um `fp_radix.do` de ~100 linhas. O arquivo versionado tem **485 linhas e 5 casos**
-(EG1–EG4 + T10), e `fp_radix.do` **não está no repositório**. Isso não é alucinação de código,
-mas é um lembrete de que **sumários gerados por IA sobre o próprio trabalho não são fonte
-confiável de verdade** — conferimos contra os arquivos. Também notamos que o `EG2b` citado no
-log não sobreviveu ao arquivo final; ele é recomendado em §4.3 justamente por cobrir o caso II
-de normalização de forma explícita.
+Ao final da sessão, o Claude produziu um resumo do próprio trabalho afirmando que o testbench
+tinha "19 casos" e "~600 linhas", e
+menciona um `fp_radix.do` de ~100 linhas. A versão que recebemos tinha **485 linhas e 5
+casos**, e `fp_radix.do` **não está no repositório**. Isso não é alucinação de código, mas é
+um lembrete de que **sumários gerados por IA sobre o próprio trabalho não são fonte confiável
+de verdade** — conferimos contra os arquivos. A cobertura foi depois completada por nós, com
+os seis casos complementares descritos em §4.3.
 
-**(9) Números de validação não reproduzíveis.** O log cita varreduras de "16.777.216
+**(9) Números de validação não reproduzíveis.** O mesmo resumo cita varreduras de "16.777.216
 combinações, 0 divergências", executadas em modelos JavaScript e GHDL dentro do ambiente da
 IA. **Não conseguimos reproduzir essas execuções**, e portanto elas **não** são apresentadas
 como evidência neste relatório. A evidência que sustenta o trabalho é a simulação no Questa
-(§4.4–4.5) e a operação na placa (§4.8), ambas executadas por nós.
+(§4.4–4.5) e a operação na placa (§4.7), ambas executadas por nós.
 
 ### 5.3 As correções humanas
 
@@ -1438,7 +1215,28 @@ levantadora de alternativas:
   seja, normalizado); deslocar 2 daria `0x0C`. Aqui a IA nos corrigiu, e a verificação
   independente foi nossa.
 
-### 5.4 Avaliação crítica do uso da ferramenta
+### 5.4 O que aceitamos, e por quê
+
+Nem tudo o que a IA propôs foi rejeitado — a maior parte do que está no `fp_adder_demo.vhd`
+nasceu de uma sugestão que analisamos e adotamos. Registramos aqui **o critério** usado em
+cada caso, porque aceitar sem entender teria produzido o mesmo código sem nenhum aprendizado.
+
+| Sugestão adotada | Por que aceitamos | O que aprendemos com isso |
+|---|---|---|
+| **Multiplexar a entrada por campo** (`SW(9:8)` seleciona, `KEY0` carrega) | Testamos o argumento contra a alternativa do contador nos botões e ele se sustentou: a carga por chaves é *idempotente*, então repetições causadas pelo quique do botão são inofensivas. Um contador não tem essa propriedade | Que uma escolha de interface pode **eliminar** um problema de hardware (debounce) em vez de tratá-lo. Passamos a olhar a idempotência como propriedade de projeto, não como detalhe |
+| **Forçar o bit 7 da fração em `'1'`** | Verificamos a premissa no `fp_adder.vhd`: o primeiro estágio compara `exp & frac` como inteiro de 12 bits, e essa comparação só vale com operandos normalizados. Garantir isso na entrada custa um fio | Entendemos por que o livro exige entrada normalizada — não é convenção, é pré-condição do comparador. E que **garantir uma pré-condição na origem** costuma ser mais barato que detectar sua violação depois |
+| **Ler o resultado pelos sete segmentos no testbench** | A alternativa óbvia — comparar `exp_out`/`frac_out` — deixaria o decodificador e a montagem dos displays sem verificação, justamente onde já tínhamos errado antes (§5.2, item 2) | Que o testbench deve exercitar a mesma interface que o usuário, e não um atalho interno. Um erro na tabela de segmentos passaria despercebido no outro formato |
+| **Exibir o estouro como `C`, deduzido fora do somador** | Conferimos o raciocínio: com sinais iguais `exp_out` só pode ser `expb` ou `expb+1`, e o ramo geral (`expb − leado`, com `leado ≤ 7`) nunca produz `0` a partir de `expb = 15`. A dedução é válida sem tocar na entidade do livro | Que dá para **recuperar informação perdida** observando o entorno, sem modificar o bloco sob análise. Foi o achado conceitual mais útil do projeto |
+| **`vsim -voptargs=+acc` no script** | Reproduzimos o problema: sem a flag, os `add wave` dos sinais internos falham em silêncio | Que otimização de simulação pode remover justamente o que se quer observar — e que ferramenta em silêncio não significa ferramenta correta |
+
+Um contraste que vale registrar: **aceitamos a explicação sobre `leado = 6` e rejeitamos a
+proposta de underflow gradual**, ambas vindas da mesma ferramenta na mesma conversa. A
+primeira era verificável — bastava deslocar `0x03` seis casas e ver o bit 7 acender. A segunda
+era uma melhoria numérica real, mas afastava o circuito do que o livro descreve, e o trabalho
+pede fidelidade ao projeto original. **O critério não foi a confiança na ferramenta, e sim a
+possibilidade de verificar e o alinhamento com o objetivo.**
+
+### 5.5 Avaliação crítica do uso da ferramenta
 
 **Onde ajudou muito:**
 
@@ -1468,7 +1266,22 @@ levantadora de alternativas:
 * **Relatos sobre o próprio trabalho.** Contagens de casos, tamanhos de arquivo e resultados de
   varreduras precisaram ser conferidos contra os arquivos reais — e divergiram (§5.2.8, §5.2.9).
 
-**Conclusão.** A IA foi um acelerador real de produtividade e um bom interlocutor técnico,
+**O que mudou na nossa forma de trabalhar.** Três hábitos saíram deste projeto:
+
+1. **Perguntar "como eu verifico isso?" antes de aceitar.** Foi o que separou a explicação do
+   `leado` (verificável em dois deslocamentos) das varreduras de milhões de vetores
+   (irreproduzíveis). O custo de verificar foi quase sempre menor que o custo de descobrir o
+   erro depois — o `"111" & SW(4:0)` sobreviveu várias respostas até esbarrarmos nele na
+   prática.
+2. **Tratar a IA como interlocutora, não como fonte.** As melhores contribuições vieram de
+   perguntas nossas — "e o valor do carry?", "o `leado` não deveria ser 2?" — e não de
+   pedidos genéricos de código. Quem faz a pergunta precisa entender o problema; a IA acelera
+   a resposta, não a formulação.
+3. **Separar o que é fiel do que é melhor.** O underflow gradual era objetivamente mais
+   preciso e mesmo assim foi recusado. Ter esse critério explícito evitou uma sequência de
+   "melhorias" que teriam descaracterizado o projeto do livro.
+
+**Conclusão.** A IA foi um acelerador real de produtividade e um bom tradutor técnico,
 especialmente para explorar alternativas e explicar comportamento. Não foi confiável como
 fonte de fatos sobre hardware específico, nem como relatora do próprio trabalho. O padrão que
 funcionou foi: **usar a IA para gerar e explicar, e o manual da placa, o livro e a simulação
@@ -1479,44 +1292,25 @@ nossa.
 
 ## 6. Contribuição dos participantes
 
-Taxonomia **CRediT** (<https://credit.niso.org/>).
+Segundo a taxonomia **CRediT** (<https://credit.niso.org/>). O trabalho foi conduzido de forma
+bastante colaborativa, assim as atribuições abaixo indicam **onde cada um concentrou esforço**, e
+não exclusividade:
 
-* **[Nome do Aluno 1]** — Administração do Projeto; Desenvolvimento, implementação e teste de
-  software (VHDL do wrapper `fp_adder_demo`, protocolo de entrada por campo, layout dos
-  displays); Análise Formal (dedução da detecção de estouro).
-* **[Nome do Aluno 2]** — Validação de dados e experimentos (execução das simulações no
-  Questa, conferência do 4º estágio nas formas de onda, testes na placa DE10-Lite);
-  Investigação (síntese e gravação no Quartus).
-* **[Nome do Aluno 3]** — Redação do manuscrito original (este documento); Curadoria de dados
-  (registro e auditoria do uso de IA em `resources/`); Validação de dados e experimentos.
+* **Kayky de Brito dos Santos** — Administração do projeto; Software (wrapper
+  `fp_adder_demo`, protocolo de entrada por campo, layout dos displays); Análise formal
+  (dedução da detecção de estouro do expoente); Metodologia (definição dos casos de teste);.
+* **Igor Domingos da Silva Mozetic** — Software (testbench e script de simulação); Validação
+  (execução das simulações no Questa e conferência do 4º estágio); Recursos (montagem do
+  projeto no Quartus, pinagem e gravação da placa); Curadoria de dados.
+* **André Luis Penha da Silva** — Redação do rascunho original; Visualização (formas de onda,
+  diagramas e fotografias da bancada); Conceituação; Curadoria de dados (registro e auditoria do uso de IA).
 
-> **[placeholder]** — substituir os nomes e ajustar a divisão de papéis conforme a realidade
-> do grupo.
-
----
-
-## Apêndice A — Limitações conhecidas e aceitas
-
-Nenhuma foi corrigida: `fp_adder.vhd` permanece como no livro (§3.3). Estão aqui como
-achados documentados.
-
-| # | Limitação | Gravidade | Como se manifesta | Correção possível |
-|---|---|---|---|---|
-| 1 | **Zero não canônico.** Se a subtração cancela tudo e `expb ≥ 7`, a condição `leado > expb` é falsa e o resultado sai como `exp = expb − 7`, `frac = 0` — um padrão *desnormalizado*, isto é, a entrada que o próprio circuito não aceita | alta | um zero com expoente não nulo, realimentado numa segunda soma, produz erro de ordens de grandeza | testar `sum = 0` **antes** dos demais ramos |
-| 2 | **Estouro do expoente dá a volta** | média — **mitigada** pelo `C` no HEX5 e `LEDR(8)` | `expb = 15` com vai-um → expoente vira 0 | saturar, ou exportar flag pela entidade |
-| 3 | **Zero negativo.** A ordenação usa `>` estrito, então o empate cai no `else` e `signb` recebe `sign2` | baixa — **fiel ao livro** (`−0.00E0` no eg. 3) | cancelamento total exibe `-` com valor zero | condicionar `sign_out` a `sum = 0` (afasta do livro) |
-| 4 | **Sem arredondamento.** Truncamento em dois pontos (alinhamento e deslocamento do vai-um), sempre na mesma direção — erro enviesado | baixa | erro sistemático de até 1 ULP por operação | arredondar exige renormalizar de novo (`0xFF + 1 = 0x100`) |
-| 5 | **Underflow sempre para zero.** Entre 0,25 e 0,5 o representável mais próximo é 0,5, não 0 | baixa — **fiel ao livro** | até 100% de erro relativo nessa faixa | underflow gradual (`sh := minimum(leado, expb)`) — afasta do livro |
-| 6 | **Entrada desnormalizada produz lixo** sem sinalização | **prevenida por hardware** | não ocorre nesta implementação | já resolvido: `frac = '1' & SW(6:0)` |
-
-Uma propriedade que **não** precisa de conserto: com entrada normalizada, a subtração nunca
-fica negativa. Se `exp_diff ≥ 1`, então `fraca ≤ 0x7F < 0x80 ≤ fracb`; se `exp_diff = 0`, a
-ordenação garante `fracb ≥ fraca`. Logo `sum(8) = '1'` só pode ser vai-um legítimo, nunca
-empréstimo — o que valida a lógica do quarto estágio.
+As etapas de investigação, validação e revisão do texto foram feitas pelos três integrantes em conjunto.
 
 ---
 
-## Apêndice B — Estrutura do repositório
+
+## Apêndice — Estrutura do repositório
 
 ```
 Trabalho-SD-2026.2/
@@ -1524,13 +1318,13 @@ Trabalho-SD-2026.2/
 ├── DOCUMENTATION.md                este documento
 ├── debug/
 │   ├── fp_adder_debug.html         calculadora do formato + conversor decimal → chaves
-│   └── de10_wave_player.html       reprodutor de VCD com desenho animado da placa
-├── resources/
-│   ├── MCTA024_Descricao_do_projeto.md    enunciado da disciplina
-│   ├── Projeto_Final_...md                §3.7.4 do livro, transcrito
-│   ├── chat_gpt_01.txt                    registro de IA
-│   ├── chat_gpt_02.txt                    registro de IA
-│   └── claude_03.md                       registro de IA
+│   ├── de10_wave_player.html       reprodutor de VCD com desenho animado da placa
+│   ├── sim_demo.vcd                dump da simulacao, exportado do Questa
+│   └── wavedrom/                   diagramas WaveDrom por caso (ondas.md + .json)
+├── img/                            figuras, GIF e videos citados neste documento
+├── tools/
+│   └── vcd_to_wavedrom.py          converte o VCD nos diagramas de debug/wavedrom/
+├── transcript_questa.txt           saida completa de `do sim_demo.do`
 └── fp_adder/
     ├── fp_adder.qpf                projeto do Quartus
     ├── fp_adder.qsf                configuração (SEM pinagem — importar DE10_LITE.qsf)
@@ -1541,33 +1335,3 @@ Trabalho-SD-2026.2/
     ├── fp_adder_demo_tb.vhd        testbench auto-verificável
     └── sim_demo.do                 script de simulação do Questa
 ```
-
-Artefatos de build (`db/`, `incremental_db/`, `output_files/`, `simulation/`, `work/`,
-`*.sof`, `*.rpt`) não são versionados. O `.gitignore` também exclui `*.tcl` e `*.sdc` — se um
-script de fluxo precisar ser versionado, usar `git add -f`.
-
----
-
-## Apêndice C — Ativos pendentes
-
-Lista consolidada do que falta anexar. Todos os itens marcados `[placeholder]` no corpo do
-documento:
-
-| # | Item | Como obter | Seção |
-|---|---|---|---|
-| 1 | Waveform do caso I (EG1) | `do sim_demo.do` no Questa, capturar janela Wave | §4.4 |
-| 2 | Waveform do caso II (EG2b, `E6`) | idem — acrescentar o `do_test` sugerido em §4.3 | §4.4 |
-| 3 | Waveform do caso III (EG3) | idem | §4.4 |
-| 4 | Waveform do caso IV (EG4) | idem | §4.4 |
-| 5 | Waveform geral da simulação | idem, após `wave zoom full` | §4.4 |
-| 6 | Transcript completo do Questa | copiar a janela Transcript após `do sim_demo.do` | §4.5 |
-| 7 | Flow Summary do Quartus | *Processing → Compilation Report → Flow Summary* | §4.6 |
-| 8 | RTL Viewer | *Tools → Netlist Viewers → RTL Viewer* | §4.6 |
-| 9 | Foto — autoteste `KEY1` | placa gravada, pressionar `KEY1`, `SW(7)=1` | §4.8 |
-| 10 | Foto — deslocamento à esquerda | carregar `+0.54E6` e `−0.55E6` | §4.8 |
-| 11 | Foto — vai-um (EG4) | carregar `+0.56E3` e `+0.52E3` | §4.8 |
-| 12 | Foto — estouro com `C` | ambos `exp=15 frac=0xFF` | §4.8 |
-| 13 | Foto — underflow para zero (EG3) | carregar `+0.54E0` e `−0.55E0` | §4.8 |
-| 14 | Nomes dos autores e data | — | cabeçalho, §6 |
-| 15 | Divisão real de papéis CRediT | — | §6 |
-| 16 | Vídeo de demonstração (opcional) | — | §4.8 |
