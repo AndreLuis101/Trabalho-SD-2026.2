@@ -1242,55 +1242,42 @@ cada caso.
 
 ### 5.5 Avaliação crítica do uso da ferramenta
 
-**Onde ajudou muito:**
+**Onde ajudou:**
 
 * **Volume mecânico.** Transcrever e formatar VHDL de um PDF, montar a tabela reversa de sete
-  segmentos do testbench, escrever os `add wave` do script `.do` — trabalho tedioso e
-  propenso a erro de digitação, feito em minutos.
+  segmentos do testbench, escrever os `add wave` do script `sim_demo.do`, facilitando os testes.
 * **Levantamento de alternativas.** Diante do gargalo de 26 bits em 10 chaves, ter quatro
-  opções com custos explícitos acelerou muito a decisão. A armadilha do debounce no contador
-  provavelmente só apareceria depois de gravada a placa.
+  opções com custos explícitos acelerou muito a decisão.
 * **Explicação sob demanda.** Perguntas como "por que o resultado desviou do livro?" e "por
   que a normalização precisa da entrada normalizada?" renderam explicações que mudaram nossa
-  compreensão do circuito — em particular, entender que o quarto estágio normaliza a *saída* e
+  compreensão do circuito – em particular, entender que o quarto estágio normaliza a *saída* e
   confia na entrada.
 * **Ferramentas descartáveis.** As duas páginas HTML de depuração não caberiam no orçamento de
-  tempo do trabalho se fossem escritas à mão, e economizaram muitas rodadas de simulação.
+  tempo do trabalho se fossem escritas à mão, e economizaram muitas rodadas de simulação, principalmente dada a baixa quantidade de oportunidades com a placa física para testes.
 
-**Onde exigiu vigilância constante:**
+**Onde exigiu vigilância:**
 
-* **Confiança uniforme.** A IA descreve com o mesmo tom seguro tanto o que verificou quanto o
+* **Confiança uniforme.** A IA descreve com o mesmo tom tanto o que verificou quanto o
   que inventou. O caminho falso do ZIP (§5.2.1) veio na mesma voz das explicações corretas.
 * **Conhecimento de hardware específico.** Codificação de segmentos, polaridade de botões e
-  pinagem da DE10-Lite foram justamente os pontos de mais erro. **O manual da placa é a
-  autoridade, não a IA.**
+  pinagem da DE10-Lite foram justamente os pontos de mais erro.
 * **Consequências numéricas de decisões estruturais.** Nenhuma das duas ferramentas percebeu
   espontaneamente que travar três bits da fração eliminaria todas as potências de dois. O erro
   só apareceu quando tentamos digitar `1,0` e descobrimos que não dava.
-* **Relatos sobre o próprio trabalho.** Contagens de casos, tamanhos de arquivo e resultados de
-  varreduras precisaram ser conferidos contra os arquivos reais — e divergiram (§5.2.8, §5.2.9).
 
-**O que mudou na nossa forma de trabalhar.** Três hábitos saíram deste projeto:
+**O que mudou na nossa forma de trabalhar:**
 
-1. **Perguntar "como eu verifico isso?" antes de aceitar.** Foi o que separou a explicação do
-   `leado` (verificável em dois deslocamentos) das varreduras de milhões de vetores
-   (irreproduzíveis). O custo de verificar foi quase sempre menor que o custo de descobrir o
-   erro depois – o `"111" & SW(4:0)` sobreviveu várias respostas até esbarrarmos nele na
-   prática.
-2. **Tratar a IA como interlocutora, não como fonte.** As melhores contribuições vieram de
+1. **Perguntar "como eu verifico isso?" antes de aceitar.**
+2. **Tratar a IA como tradutor, não como fonte.** As melhores contribuições vieram de
    perguntas nossas – "e o valor do carry?", "o `leado` não deveria ser 2?" – e não de
-   pedidos genéricos de código. Quem faz a pergunta precisa entender o problema; a IA acelera
-   a resposta, não a formulação.
-3. **Separar o que é fiel do que é melhor.** O underflow gradual era objetivamente mais
-   preciso e mesmo assim foi recusado. Ter esse critério explícito evitou uma sequência de
-   "melhorias" que teriam descaracterizado o projeto do livro.
+   pedidos genéricos de código. Quem faz a pergunta precisa entender o problema que está tentnado solucionar.
 
 **Conclusão.** A IA foi um acelerador real de produtividade e um bom tradutor técnico,
 especialmente para explorar alternativas e explicar comportamento. Não foi confiável como
-fonte de fatos sobre hardware específico, nem como relatora do próprio trabalho. O padrão que
-funcionou foi: **usar a IA para gerar e explicar, e o manual da placa, o livro e a simulação
-para decidir.** A responsabilidade técnica pelo que está neste repositório é inteiramente
-nossa.
+fonte de fatos sobre hardware específico. 
+
+O padrão que funcionou foi: **usar a IA para gerar e explicar, e os assignments da placa, o livro e a simulação
+para decidir.** 
 
 ---
 
